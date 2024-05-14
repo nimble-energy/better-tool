@@ -7,48 +7,69 @@ If you have questions about your rights to use or distribute this software, plea
 NOTICE.  This Software was developed under funding from the U.S. Department of Energy and the U.S. Government consequently retains certain rights. As such, the U.S. Government has been granted for itself and others acting on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the Software to reproduce, distribute copies to the public, prepare derivative works, and perform publicly and display publicly, and to permit other to do so. 
 
 '''
-
+from typing import Literal
+import pandas as pd
 from scipy import optimize, stats
 import numpy as np
-
-import constants
+import numpy.typing as npt
+import math
 
 
 class InverseModel:
-    def __init__(self, temperature, eui, energy_type='Energy type unknown', significance_threshold=0.1):
+    """A class to hold an inverse model for a facility"""
+
+    def __init__(self,
+                 temperature: npt.ArrayLike,
+                 eui: npt.ArrayLike,
+                 significance_threshold: float = 0.1):
 
         if (np.size(eui) != np.size(temperature)):
-            print("Please make sure eui and temperature arrays have the same length")
+            raise Exception(
+                "EUI and Temperature arrays must have the same length")
+
+        self.has_fit: bool = False
+
+        # Got inconsistent results when converted pd.Series to numpy array in test, so ensuring eui is an array
+        if isinstance(temperature, pd.Series):
+            self.temperature: npt.ArrayLike = temperature.to_numpy()
         else:
-            self.temperature = temperature
-            self.eui = eui
-            self.energy_type = energy_type
-            self.hcp_bound_percentile = 45
-            self.ccp_bound_percentile = 55
-            percentiles = self.hcp_bound_percentile, self.ccp_bound_percentile
-            self.hcp, self.ccp = np.percentile(self.temperature,
-                                               percentiles)  # Set initial boundaries for change-point models
-            self.hcp_min = self.hcp  # Heating change-point minimum
-            self.hcp_max = self.ccp  # Heating change-point maximum
-            self.ccp_min = self.hcp  # Cooling change-point minimum
-            self.ccp_max = self.ccp  # Cooling change-point minimum
-            self.base_min = 0  # Baseload minimum
-            self.base_max = np.inf  # Baseload maximum
-            self.hsl_min = -np.inf  # Heating slope minimum
-            self.hsl_max = 0  # Heating slope maximum
-            self.csl_min = 0  # Cooling slope minimum
-            self.csl_max = np.inf  # Cooling slope maximum
-            self.significance_threshold = significance_threshold
-            self.hsl_insignificant = False  # assume significant heating slope
-            self.csl_insignificant = False  # assume significant cooling slope
-            self.best_model = None
+            self.temperature: npt.ArrayLike = temperature
+        if isinstance(eui, pd.Series):
+            self.eui: npt.ArrayLike = eui.to_numpy()
+        else:
+            self.eui: npt.ArrayLike = eui
+
+        self.hcp_bound_percentile = 45
+        self.ccp_bound_percentile = 55
+        percentiles = self.hcp_bound_percentile, self.ccp_bound_percentile
+        self.hcp, self.ccp = np.percentile(self.temperature,  # type: ignore
+                                           percentiles)  # Set initial boundaries for change-point models
+        self.hcp_min = self.hcp  # Heating change-point minimum
+        self.hcp_max = self.ccp  # Heating change-point maximum
+        self.ccp_min = self.hcp  # Cooling change-point minimum
+        self.ccp_max = self.ccp  # Cooling change-point minimum
+        self.base_min = 0  # Baseload minimum
+        self.base_max = np.inf  # Baseload maximum
+        self.hsl_min = -np.inf  # Heating slope minimum
+        self.hsl_max = 0  # Heating slope maximum
+        self.csl_min = 0  # Cooling slope minimum
+        self.csl_max = np.inf  # Cooling slope maximum
+        self.significance_threshold = significance_threshold
+        self.hsl_insignificant = False  # assume significant heating slope
+        self.csl_insignificant = False  # assume significant cooling slope
+        self.best_model = None
 
     @staticmethod
-    def piecewise_linear(x, hcp, ccp, base, hsl, csl):
-        #  k1  \              / k2
+    def piecewise_linear(x: npt.ArrayLike,
+                         hcp: float,
+                         ccp: float,
+                         base: float,
+                         hsl: float,
+                         csl: float):
+        #  hsl \              / csl
         #       \            /
-        # y0     \__________/
-        #        cpL      cpR
+        # base   \__________/
+        #        hcp       ccp
 
         # Handle 3P models when use this function to predict.
         if np.isnan(hcp) and np.isnan(hsl):
@@ -71,7 +92,8 @@ class InverseModel:
         y = self.eui
         return np.sqrt(np.mean([(i - j) ** 2 for i, j in zip(y, yp)]))
 
-    def R_Squared(self, adjusted_r2_calc=False):
+    def calcuate_r_squared(self,
+                           calculate_adjusted_r2: bool = False) -> float:
         x = self.temperature
         y = self.eui
         residuals = y - self.piecewise_linear(x, *self.p)
@@ -81,39 +103,47 @@ class InverseModel:
         r2_result = rsquared
         n = len(self.eui)
         numP = len(np.nonzero(self.p))
+
         # If we need to calculate adjusted r-squared
-        if (adjusted_r2_calc and n - numP - 1 != 0):
+        if (calculate_adjusted_r2 and n - numP - 1 != 0):
             r2_result = 1 - (1 - rsquared) * (n - 1) / (n - numP - 1)
 
         self.r2 = r2_result
-        return (r2_result)
 
-    def fit(self):
+        return r2_result
+
+    def fit(self) -> None:
+        """Creates an initial fit to of the changepoint model"""
         try:
             self.p, self.e = optimize.curve_fit(
                 self.piecewise_linear,
                 self.temperature,
                 self.eui,
                 bounds=([self.hcp_min, self.ccp_min, self.base_min, self.hsl_min, self.csl_min],
-                        [self.hcp_max, self.ccp_max, self.base_max, self.hsl_max, self.csl_max]
+                        [self.hcp_max, self.ccp_max, self.base_max,
+                            self.hsl_max, self.csl_max]
                         )
             )
             # Model coefficients
             self.hcp, self.ccp, self.base, self.hsl, self.csl = self.p
 
-            # Get p-value from t-stes for the model coefficients
+            # Get p-value from t-test for the model coefficients
             n = len(self.temperature)
-            self.p_base = stats.t.sf(self.base / np.sqrt(np.diag(self.e)[2] / n), df=n - 2)
-            self.p_hsl = stats.t.cdf(self.hsl / np.sqrt(np.diag(self.e)[3] / n), df=n - 2)
-            self.p_csl = stats.t.sf(self.csl / np.sqrt(np.diag(self.e)[4] / n), df=n - 2)
+            self.p_base = stats.t.sf(
+                self.base / np.sqrt(np.diag(self.e)[2] / n), df=n - 2)
+            self.p_hsl = stats.t.cdf(
+                self.hsl / np.sqrt(np.diag(self.e)[3] / n), df=n - 2)
+            self.p_csl = stats.t.sf(
+                self.csl / np.sqrt(np.diag(self.e)[4] / n), df=n - 2)
             # self.p_hcp = stats.t.cdf(abs(self.hcp - self.hcp_min) / np.sqrt(np.diag(self.e)[0]/n), df = n-2)
             # self.p_ccp = stats.t.cdf(abs(self.ccp - self.ccp_max) / np.sqrt(np.diag(self.e)[1]/n), df = n-2)
         except:
             self.has_fit = False
 
+    def optimize_cp_limit(self,
+                          point: Literal['L', 'R']) -> list[float]:
+        """Finds the optimum range for heating and cooling change-points bounds"""
 
-    def optimize_cp_limit(self, point):
-        # Finds the optimum range for heating and cooling change-points bounds
         if point == "R":
             percentiles = [[i, i + 5] for i in np.arange(30, 90, 5)]
         else:
@@ -134,12 +164,13 @@ class InverseModel:
 
             self.fit()
             # print(self.p)
-            r2 = self.R_Squared()
+            r2 = self.calcuate_r_squared()
             # print('P value: base= {:04.3f}, left= {:04.3f}, right= {:04.3f}, R2 = {:04.2f} '.format(self.p_base, self.p_hsl, self.p_csl, r2 ))
             var.append(r2)
 
         optimum_limits = percentiles[var.index(max(var))]
-        cp_limit_min, cp_limit_max = np.percentile(self.temperature, optimum_limits)
+        cp_limit_min, cp_limit_max = np.percentile(
+            self.temperature, optimum_limits)
         if point == "L":
             self.hcp_min = cp_limit_min  # Heating change-point minimum
             self.hcp_max = cp_limit_max  # Heating change-point maximum
@@ -150,50 +181,39 @@ class InverseModel:
         self.fit()
         return optimum_limits
 
-    def fit_model(self, has_fit=False, threshold=0.1):
-        ### Handle outliers (TBD)
+    def fit_model(self,
+                  r_squared_threshold: float = 0.1):
+        # Handle outliers (TBD)
 
-        ### Fit change-point model
+        # Fit change-point model
         self.fit()  # Initial guess
         self.p_init = self.p
 
-
-        # self.optimize_slopes()
-        # self.optimize_cp_limit("L")
-        # self.optimize_cp_limit("R")
-        # self.optimize_slopes()
-        # self.inverse_cp()
-        # self.model_type()  # Get model type
-        # has_fit = True
-        # self.has_fit = has_fit
-        # # Save final model coefficients
-        # return (has_fit)
-
-        if (self.R_Squared() < threshold):
+        if (self.calcuate_r_squared() < r_squared_threshold):
             print('No fit found')
             # Cannot accept model immediately. No meaningful correlation found.
-            return (has_fit)
-        else:
-            self.optimize_slopes()
-            self.optimize_cp_limit("L")
-            self.optimize_cp_limit("R")
-            self.optimize_slopes()
-            self.inverse_cp()
-            self.model_type()  # Get model type
-            has_fit = True
-            self.has_fit = has_fit
-            # Save final model coefficients
-            return (has_fit)
+            return self.has_fit
+
+        self.optimize_slopes()
+        self.optimize_cp_limit("L")
+        self.optimize_cp_limit("R")
+        self.optimize_slopes()
+        self.inverse_cp()
+        self.populate_model_type_data()  # Get model type
+        self.has_fit = True
+        # Save final model coefficients
+        return self.has_fit
 
     def optimize_slopes(self):
-        import math
+        """Optimize the slopes of the changepoint model"""
+
         if (not (self.significant(self.p_hsl)) or math.isnan(self.p_hsl)):
-            # print("--->Left slope is not significant! - P=",self.p_hsl)
+            # print("--->Left slope is not significant! - P=", self.p_hsl)
             self.hsl_min = -10 ** -3
             self.hsl_insignificant = True
 
         if (not (self.significant(self.p_csl)) or math.isnan(self.p_csl)):
-            # print("--->Right slope is not significant!- P=",self.p_csl)
+            # print("--->Right slope is not significant!- P=", self.p_csl)
             self.csl_max = 10 ** -3
             self.csl_insignificant = True
 
@@ -213,207 +233,73 @@ class InverseModel:
 
     def inverse_cp(self):
         if self.hcp > self.ccp and not self.csl_insignificant and not self.hsl_insignificant:
-            cp = (self.hsl * self.hcp - self.csl * self.ccp) / (self.hsl - self.csl)
+            cp = (self.hsl * self.hcp - self.csl *
+                  self.ccp) / (self.hsl - self.csl)
             self.hcp = self.ccp = cp
 
-    def significant(self, x, threshold=0.05):
-        sig = True if x < threshold else False
-        return sig
+    def significant(self,
+                    value: npt.ArrayLike,
+                    threshold: float = 0.05):
+        return value < threshold
 
-    def model_type(self):
-        # This function clean up the model parameters and assign model type string
+    def populate_model_type_data(self):
+        # This function cleans up the model parameters and assign model type string
         self.cp_txt = []
-        self.R_Squared()
+        self.calcuate_r_squared()
+
         if (self.hcp is None):
             self.model_type_str = 'No fit'
+            self.cp_txt = []
             self.has_fit = False
-            self.coeff_validation = {'base': False, 'csl': False, 'ccp': False, 'hsl': False, 'hcp': False}
+
+            self.coeff_validation = {
+                'base': False, 'csl': False, 'ccp': False, 'hsl': False, 'hcp': False}
+
         elif (self.hcp == self.ccp and self.hsl == 0):
             self.model_type_str = "3P Cooling"
-            self.cp_txt = "(" + str(round(self.ccp, 1)) + ", " + str(round(self.base, 1)) + ")"
+            self.cp_txt = str((round(self.ccp, 1), round(self.base, 1)))
             self.hcp = self.ccp
             self.hsl = 0
             # self.hsl, self.hcp = np.nan, np.nan
 
-            self.coeff_validation = {'base': True, 'csl': True, 'ccp': True, 'hsl': False, 'hcp': False}
+            self.coeff_validation = {
+                'base': True, 'csl': True, 'ccp': True, 'hsl': False, 'hcp': False}
+
         elif (self.hcp == self.ccp and self.csl == 0):
             self.model_type_str = "3P Heating"
-            self.cp_txt = "(" + str(round(self.hcp, 1)) + ", " + str(round(self.base, 1)) + ")"
+            self.cp_txt = str((round(self.hcp, 1), round(self.base, 1)))
             self.ccp = self.hcp
             self.csl = 0
             # self.csl, self.ccp = np.nan, np.nan
 
-            self.coeff_validation = {'base': True, 'csl': False, 'ccp': False, 'hsl': True, 'hcp': True}
+            self.coeff_validation = {
+                'base': True, 'csl': False, 'ccp': False, 'hsl': True, 'hcp': True}
+
         elif (self.hcp == self.ccp and self.csl != 0 and self.hsl != 0):
             self.model_type_str = "4P"
-            self.cp_txt = "(" + str(round(self.hcp, 1)) + ", " + str(round(self.base, 1)) + ")"
-            self.coeff_validation = {'base': True, 'csl': True, 'ccp': True, 'hsl': True, 'hcp': True}
+            self.cp_txt = str((round(self.hcp, 1), round(self.base, 1)))
+
+            self.coeff_validation = {
+                'base': True, 'csl': True, 'ccp': True, 'hsl': True, 'hcp': True}
+
         elif (self.hcp != self.ccp and self.csl != 0 and self.hsl != 0):
             self.model_type_str = "5P"
-            self.cp_txt.append("(" + str(round(self.hcp, 1)) + ", " + str(round(self.base, 1)) + ")")
-            self.cp_txt.append("(" + str(round(self.ccp, 1)) + ", " + str(round(self.base, 1)) + ")")
-            self.coeff_validation = {'base': True, 'csl': True, 'ccp': True, 'hsl': True, 'hcp': True}
+            self.cp_txt = [str((round(self.hcp, 1), round(self.base, 1))), str(
+                (round(self.ccp, 1), round(self.base, 1)))]
+
+            self.coeff_validation = {
+                'base': True, 'csl': True, 'ccp': True, 'hsl': True, 'hcp': True}
+
         # Finally assign the model coefficients
-        self.coeffs = {'base': self.base, 'csl': self.csl, 'ccp': self.ccp, 'hsl': abs(self.hsl), 'hcp': self.hcp}
-        self.model_p = np.array([self.hcp, self.ccp, self.base, self.hsl, self.csl])
-        
+        self.coeffs = {'base': self.base, 'csl': self.csl,
+                       'ccp': self.ccp, 'hsl': abs(self.hsl), 'hcp': self.hcp}
 
-    def model_lines(self,mts,x,y):
-        if mts == "3P Cooling":
-            return """{
-                    label: 'Cooling',
-                    data:""" + str([{"x:{:.2f}".format(x[i]),"y:{:.2f}".format(y[i])} for i in range(2,4) ]).replace("'","") + """,
-                    showLine: true,
-                    lineTension: 1,
-                    pointRadius: 1,
-                    fill: false,
-                    borderColor: 'rgba(31,78,121,1)',
-                    backgroundColor: 'rgba(31,78,121,1)' 
-                    },
-                  {
-                    label: 'Baseload',
-                    data:""" + str([{"x:{:.2f}".format(x[i]),"y:{:.2f}".format(y[i])} for i in range(0,2) ]).replace("'","") + """,
-                    showLine: true,
-                    lineTension: 0,
-                    pointRadius: 0,
-                    fill: false,
-                    borderColor: 'rgba(127, 127, 127, 1)',
-                    backgroundColor: 'rgba(127, 127, 127, 1)'
-                    }"""
-        elif mts == "3P Heating":
-            return """{
-                    label: 'Heating',
-                    data:""" + str([{"x:{:.2f}".format(x[i]),"y:{:.2f}".format(y[i])} for i in range(0,2) ]).replace("'","") + """,
-                    showLine: true,
-                    lineTension: 0,
-                    pointRadius: 0,
-                    fill: false,
-                    borderColor: 'rgba(192,0,0,1)',
-                    backgroundColor: 'rgba(192,0,0,1)'
-                    },
-                  {
-                    label: 'Baseload',
-                    data:""" + str([{"x:{:.2f}".format(x[i]),"y:{:.2f}".format(y[i])} for i in range(2,4) ]).replace("'","") + """,
-                    showLine: true,
-                    lineTension: 0,
-                    pointRadius: 0,
-                    fill: false,
-                    borderColor: 'rgba(127, 127, 127, 1)',
-                    backgroundColor: 'rgba(127, 127, 127, 1)'
-                    }"""
-        else :
-            return """{
-                    label: 'Heating',
-                    data:""" + str([{"x:{:.2f}".format(x[i]),"y:{:.2f}".format(y[i])} for i in range(0,2) ]).replace("'","") + """,
-                    showLine: true,
-                    lineTension: 0,
-                    pointRadius: 0,
-                    fill: false,
-                    borderColor: 'rgba(192,0,0,1)',
-                    backgroundColor: 'rgba(192,0,0,1)'
-                    },
-                  {
-                    label: 'Cooling',
-                    data:""" + str([{"x:{:.2f}".format(x[i]),"y:{:.2f}".format(y[i])} for i in range(2,4) ]).replace("'","") + """,
-                    showLine: true,
-                    lineTension: 1,
-                    pointRadius: 0,
-                    fill: false,
-                    borderColor: 'rgba(31,78,121,1)',
-                    backgroundColor: 'rgba(31,78,121,1)'
-                    },
-                  {
-                    label: 'Baseload',
-                    data:""" + str([{"x:{:.2f}".format(x[i]),"y:{:.2f}".format(y[i])} for i in range(1,3) ]).replace("'","") + """,
-                    showLine: true,
-                    lineTension: 0,
-                    pointRadius: 0,
-                    fill: false,
-                    borderColor: 'rgba(127, 127, 127, 1)',
-                    backgroundColor: 'rgba(127, 127, 127, 1)'
-                    }"""
-                      
+        self.model_p = np.array(
+            [self.hcp, self.ccp, self.base, self.hsl, self.csl])
 
-    def plot_IM(self, building):
-        self.describe_model_html(building)
-        x = [min(self.temperature) - 1, self.hcp, self.ccp, max(self.temperature) + 1]
-        y = self.piecewise_linear([min(self.temperature) - 1, self.hcp, self.ccp, max(self.temperature) + 1], *self.p)
+    def print_im(self):
+        """Prints model parameters to the console"""
 
-        model_type = '"e_model"' if self.energy_type == 'Electricity' else '"f_model"'
-
-        self.model_chart_html = """
-            <script>
-            var ctx = document.getElementById(""" + model_type + """);
-            var myChart = new Chart(ctx, {
-              type: 'scatter',
-              data: {
-                datasets: [
-                    
-                  {
-                    label: 'Data',
-                    data: """ + str([{"x:{:.2f}".format(self.temperature[i]),"y:{:.2f}".format(np.array(self.eui)[i])} for i in range(0,len(self.temperature)) ]).replace("'","") +""",
-                    showLine: false,
-                    fill: false,
-                    borderColor: 'rgba(0,0,0,1)',
-                    backgroundColor: 'rgba(0,0,0,1)'
-                    },""" + self.model_lines(self.model_type_str,x,y) + """ ]
-              },
-              options: {
-          		 maintainAspectRatio: false,
-              legend: {
-                    position: "bottom"
-                    },
-              scales: {
-                    xAxes: [{
-                    ticks: {
-                      beginAtZero:true
-                    },
-                    scaleLabel:{
-                            display : true,
-                            labelString: "Outside Air Temperature (°C)",
-                            },
-                    }],
-                    yAxes: [{
-                    ticks: {
-                      beginAtZero:true
-                    },
-                    scaleLabel:{
-                            display : true,
-                            labelString: "Energy Intensity (kWh/m²-day)",
-                            },
-                    }]
-                },
-
-                tooltips: {
-                  mode: 'index',
-                  intersect: false,
-                },
-                hover: {
-                  mode: 'nearest',
-                  intersect: true
-                },
-              }
-            });
-            </script>"""
-
-    def describe_model_html(self, building):
-        model_description_html = ""
-        if (self.has_fit):
-            model_description_html += '<p>'
-            model_description_html += '<b>' + self.energy_type + ':</b> '
-            model_description_html += 'Your consistent baseload is ' + str(round(self.base, 1)) + ' kWh/(m<sup>2</sup>*day), or ' + str(round(self.base * 1 * constants.Constants.days_in_year, 1)) + ' kWh/(m<sup>2</sup>*yr) <b>[Baseload]</b>. '
-            if(self.model_type_str != '3P Heating'):
-                model_description_html += 'The building is in cooling mode when the outside air temperature is above ' + str(round(self.ccp, 1)) + ' &#176;C <b>[Cooling Change Point]</b>. '
-                model_description_html += 'During cooling, the building daily energy consumption increases by ' + str(round(building.bldg_area * self.csl, 1)) + ' kWh/day for each 1 degree increase in outside air temperature <b>[Cooling Sensitivity]</b>. '
-            if(self.model_type_str != '3P Cooling'):
-                model_description_html += 'The building is in heating mode when the outside air temperature is below ' + str(round(self.hcp, 1)) + ' &#176;C <b>[Heating Start Point]</b>. '
-                model_description_html += 'During heating, the building daily energy consumption increases by ' + str(round(abs(building.bldg_area * self.hsl), 1)) + ' kWh/day for each 1 degree decrease in outside air temperature <b>[Heating Sensitivity]</b>.'
-            model_description_html += '</p>'
-        else:
-            model_description_html = ''
-        self.model_description_html = model_description_html
-
-    def print_IM(self):
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
         print("Final Model:")
         print("    Model Type: " + self.model_type_str)
@@ -422,7 +308,178 @@ class InverseModel:
         print("    Heating change-point: %s" % self.hcp)
         print("    Cooling slope: %s" % self.csl)
         print("    Cooling change-point: %s" % self.ccp)
-        print("    R-sqaured: %s" % self.R_Squared())
+        print("    R-sqaured: %s" % self.calcuate_r_squared())
         print(
             '    P value: base= {:04.3f}, left= {:04.3f}, right= {:04.3f}'.format(self.p_base, self.p_hsl, self.p_csl))
         print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
+
+    # def model_lines(self, mts, x, y):
+    #     if mts == "3P Cooling":
+    #         return """{
+    #                 label: 'Cooling',
+    #                 data:""" + str([{"x:{:.2f}".format(x[i]), "y:{:.2f}".format(y[i])} for i in range(2, 4)]).replace("'", "") + """,
+    #                 showLine: true,
+    #                 lineTension: 1,
+    #                 pointRadius: 1,
+    #                 fill: false,
+    #                 borderColor: 'rgba(31,78,121,1)',
+    #                 backgroundColor: 'rgba(31,78,121,1)'
+    #                 },
+    #               {
+    #                 label: 'Baseload',
+    #                 data:""" + str([{"x:{:.2f}".format(x[i]), "y:{:.2f}".format(y[i])} for i in range(0, 2)]).replace("'", "") + """,
+    #                 showLine: true,
+    #                 lineTension: 0,
+    #                 pointRadius: 0,
+    #                 fill: false,
+    #                 borderColor: 'rgba(127, 127, 127, 1)',
+    #                 backgroundColor: 'rgba(127, 127, 127, 1)'
+    #                 }"""
+    #     elif mts == "3P Heating":
+    #         return """{
+    #                 label: 'Heating',
+    #                 data:""" + str([{"x:{:.2f}".format(x[i]), "y:{:.2f}".format(y[i])} for i in range(0, 2)]).replace("'", "") + """,
+    #                 showLine: true,
+    #                 lineTension: 0,
+    #                 pointRadius: 0,
+    #                 fill: false,
+    #                 borderColor: 'rgba(192,0,0,1)',
+    #                 backgroundColor: 'rgba(192,0,0,1)'
+    #                 },
+    #               {
+    #                 label: 'Baseload',
+    #                 data:""" + str([{"x:{:.2f}".format(x[i]), "y:{:.2f}".format(y[i])} for i in range(2, 4)]).replace("'", "") + """,
+    #                 showLine: true,
+    #                 lineTension: 0,
+    #                 pointRadius: 0,
+    #                 fill: false,
+    #                 borderColor: 'rgba(127, 127, 127, 1)',
+    #                 backgroundColor: 'rgba(127, 127, 127, 1)'
+    #                 }"""
+    #     else:
+    #         return """{
+    #                 label: 'Heating',
+    #                 data:""" + str([{"x:{:.2f}".format(x[i]), "y:{:.2f}".format(y[i])} for i in range(0, 2)]).replace("'", "") + """,
+    #                 showLine: true,
+    #                 lineTension: 0,
+    #                 pointRadius: 0,
+    #                 fill: false,
+    #                 borderColor: 'rgba(192,0,0,1)',
+    #                 backgroundColor: 'rgba(192,0,0,1)'
+    #                 },
+    #               {
+    #                 label: 'Cooling',
+    #                 data:""" + str([{"x:{:.2f}".format(x[i]), "y:{:.2f}".format(y[i])} for i in range(2, 4)]).replace("'", "") + """,
+    #                 showLine: true,
+    #                 lineTension: 1,
+    #                 pointRadius: 0,
+    #                 fill: false,
+    #                 borderColor: 'rgba(31,78,121,1)',
+    #                 backgroundColor: 'rgba(31,78,121,1)'
+    #                 },
+    #               {
+    #                 label: 'Baseload',
+    #                 data:""" + str([{"x:{:.2f}".format(x[i]), "y:{:.2f}".format(y[i])} for i in range(1, 3)]).replace("'", "") + """,
+    #                 showLine: true,
+    #                 lineTension: 0,
+    #                 pointRadius: 0,
+    #                 fill: false,
+    #                 borderColor: 'rgba(127, 127, 127, 1)',
+    #                 backgroundColor: 'rgba(127, 127, 127, 1)'
+    #                 }"""
+
+    # def plot_IM(self,
+    #             building):
+    #     """Creates model plot and stores in model_chart_html property"""
+
+    #     self.describe_model_html(building)
+    #     x = [min(self.temperature) - 1, self.hcp,
+    #          self.ccp, max(self.temperature) + 1]
+    #     y = self.piecewise_linear(
+    #         [min(self.temperature) - 1, self.hcp, self.ccp, max(self.temperature) + 1], *self.p)
+
+    #     model_type = '"e_model"' if self.energy_type == 'Electricity' else '"f_model"'
+
+    #     self.model_chart_html = """
+    #         <script>
+    #         var ctx = document.getElementById(""" + model_type + """);
+    #         var myChart = new Chart(ctx, {
+    #           type: 'scatter',
+    #           data: {
+    #             datasets: [
+
+    #               {
+    #                 label: 'Data',
+    #                 data: """ + str([{"x:{:.2f}".format(self.temperature[i]), "y:{:.2f}".format(np.array(self.eui)[i])} for i in range(0, len(self.temperature))]).replace("'", "") + """,
+    #                 showLine: false,
+    #                 fill: false,
+    #                 borderColor: 'rgba(0,0,0,1)',
+    #                 backgroundColor: 'rgba(0,0,0,1)'
+    #                 },""" + self.model_lines(self.model_type_str, x, y) + """ ]
+    #           },
+    #           options: {
+    #       		 maintainAspectRatio: false,
+    #           legend: {
+    #                 position: "bottom"
+    #                 },
+    #           scales: {
+    #                 xAxes: [{
+    #                 ticks: {
+    #                   beginAtZero:true
+    #                 },
+    #                 scaleLabel:{
+    #                         display : true,
+    #                         labelString: "Outside Air Temperature (°C)",
+    #                         },
+    #                 }],
+    #                 yAxes: [{
+    #                 ticks: {
+    #                   beginAtZero:true
+    #                 },
+    #                 scaleLabel:{
+    #                         display : true,
+    #                         labelString: "Energy Intensity (kWh/m²-day)",
+    #                         },
+    #                 }]
+    #             },
+
+    #             tooltips: {
+    #               mode: 'index',
+    #               intersect: false,
+    #             },
+    #             hover: {
+    #               mode: 'nearest',
+    #               intersect: true
+    #             },
+    #           }
+    #         });
+    #         </script>"""
+
+    # def describe_model_html(self,
+    #                         building):
+    #     """Generates model description HTML and stores in model_description_html property"""
+
+    #     model_description_html = ""
+    #     if (self.has_fit):
+    #         model_description_html += '<p>'
+    #         model_description_html += '<b>' + self.energy_type + ':</b> '
+    #         model_description_html += 'Your consistent baseload is ' + str(round(self.base, 1)) + ' kWh/(m<sup>2</sup>*day), or ' + str(
+    #             round(self.base * 1 * Constants.days_in_year, 1)) + ' kWh/(m<sup>2</sup>*yr) <b>[Baseload]</b>. '
+    #         if (self.model_type_str != '3P Heating'):
+    #             model_description_html += 'The building is in cooling mode when the outside air temperature is above ' + \
+    #                 str(round(self.ccp, 1)) + \
+    #                 ' &#176;C <b>[Cooling Change Point]</b>. '
+    #             model_description_html += 'During cooling, the building daily energy consumption increases by ' + \
+    #                 str(round(building.bldg_area * self.csl, 1)) + \
+    #                 ' kWh/day for each 1 degree increase in outside air temperature <b>[Cooling Sensitivity]</b>. '
+    #         if (self.model_type_str != '3P Cooling'):
+    #             model_description_html += 'The building is in heating mode when the outside air temperature is below ' + \
+    #                 str(round(self.hcp, 1)) + \
+    #                 ' &#176;C <b>[Heating Start Point]</b>. '
+    #             model_description_html += 'During heating, the building daily energy consumption increases by ' + \
+    #                 str(round(abs(building.bldg_area * self.hsl), 1)) + \
+    #                 ' kWh/day for each 1 degree decrease in outside air temperature <b>[Heating Sensitivity]</b>.'
+    #         model_description_html += '</p>'
+    #     else:
+    #         model_description_html = ''
+    #     self.model_description_html = model_description_html

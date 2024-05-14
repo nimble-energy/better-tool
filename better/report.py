@@ -7,10 +7,12 @@ If you have questions about your rights to use or distribute this software, plea
 NOTICE.  This Software was developed under funding from the U.S. Department of Energy and the U.S. Government consequently retains certain rights. As such, the U.S. Government has been granted for itself and others acting on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the Software to reproduce, distribute copies to the public, prepare derivative works, and perform publicly and display publicly, and to permit other to do so.
 
 '''
+import pathlib
+import better.constants as constants
 
 import datetime
 import numpy as np
-import constants
+
 
 class Report:
 
@@ -35,7 +37,7 @@ class Report:
 
     @staticmethod
     def html_basic():
-        html_text =  '''
+        html_text = '''
             <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1">
             <link rel="stylesheet" href="https://www.w3schools.com/w3css/4/w3.css">
@@ -95,7 +97,8 @@ class Report:
         html_text += self.jci_logo
         html_text += '        <br><br>'
         html_text += '        <h4><b>Building Efficiency Targeting Tool for Energy Retrofits (BETTER)</b></h4>'
-        html_text += '        <p class="w3-text-grey">' + datetime.datetime.now().strftime("%Y-%m-%d  %H:%M") + '</p>'
+        html_text += '        <p class="w3-text-grey">' + \
+            datetime.datetime.now().strftime("%Y-%m-%d  %H:%M") + '</p>'
         html_text += '    </div>'
         html_text += '    <div class="w3-bar-block">'
         html_text += '        <a href="#overview" onclick="w3_close()" class="w3-bar-item w3-button w3-padding"><i class="fa fa-th-large fa-fw w3-margin-right"></i>Overview</a> '
@@ -112,113 +115,151 @@ class Report:
         html_text += '<div class="w3-main" style="margin-left:300px; margin-right:20px">'
         return html_text
 
-    def generate_building_report_beta(self, report_path):
-        report_file = report_path + str(self.building.bldg_id) + '_' + self.building.bldg_address + '_' + self.building.bldg_name + '_report.html'
-        report_file = report_file.replace(' ', '_')
+    def generate_building_report_beta(self, report_path: pathlib.Path):
+        report_file = report_path / \
+            str.replace(
+                f'{str(self.building.bldg_id)}_{self.building.bldg_address}_{self.building.bldg_name}_report.html', ' ', '_')
         print(report_file)
         with open(report_file, 'w', encoding="utf-8") as report_html:
             report_html.write('<!DOCTYPE html>')
             report_html.write('<html>')
-            report_html.write('<title>Building Efficiency Targeting Tool for Energy Retrofits (BETTER) Report</title>')
+            report_html.write(
+                '<title>Building Efficiency Targeting Tool for Energy Retrofits (BETTER) Report</title>')
 
             # Add basic stuff including css and scripts
             report_html.write(self.html_basic())
 
-            report_html.write('<body class="w3-light-grey w3-content" style="max-width:1500px">')
+            report_html.write(
+                '<body class="w3-light-grey w3-content" style="max-width:1500px">')
             report_html.write('<!-- Sidebar/menu -->')
 
-             # Navigation bar
+            # Navigation bar
             report_html.write(self.navigation_bar())
 
             # Building Overview Card
-            report_html.write('  <div class="w3-container w3-padding-large w3-white">')
-            report_html.write('    <h2 id="overview"><b>' + self.building.bldg_name.upper() + '</b></h2>')
+            report_html.write(
+                '  <div class="w3-container w3-padding-large w3-white">')
+            report_html.write('    <h2 id="overview"><b>' +
+                              self.building.bldg_name.upper() + '</b></h2>')
             report_html.write('    <hr class="w3-opacity">')
 
-            report_html.write('<div class="w3-container w3-margin-bottom w3-padding-small">')
-            report_html.write('    <table class="w3-table w3-bordered w3-border" style="width:95% border: solid 1 px blue">')
+            report_html.write(
+                '<div class="w3-container w3-margin-bottom w3-padding-small">')
+            report_html.write(
+                '    <table class="w3-table w3-bordered w3-border" style="width:95% border: solid 1 px blue">')
             report_html.write('  <tr>')
-            report_html.write('    <td class="td_border" colspan="3"><b>Building Type</b></td>')
-            report_html.write('    <td class="td_border" colspan="3">' + self.building.bldg_type + '</td>')
-            report_html.write('    <td class="td_border" colspan="3"><b>Building Location</b></td>')
-            report_html.write('    <td class="td_border" colspan="3">' + self.building.bldg_address + '</td>')
+            report_html.write(
+                '    <td class="td_border" colspan="3"><b>Building Type</b></td>')
+            report_html.write(
+                '    <td class="td_border" colspan="3">' + self.building.bldg_type + '</td>')
+            report_html.write(
+                '    <td class="td_border" colspan="3"><b>Building Location</b></td>')
+            report_html.write(
+                '    <td class="td_border" colspan="3">' + self.building.bldg_address + '</td>')
             report_html.write('  </tr>')
             report_html.write('  <tr>')
-            report_html.write('    <td class="td_border" colspan="3"><b>Gross Floor Area (m<sup>2</sup>)</b></td>')
-            report_html.write('    <td class="td_border" colspan="9">' + '{:,}'.format(self.building.bldg_area) + '</td>')
+            report_html.write(
+                '    <td class="td_border" colspan="3"><b>Gross Floor Area (m<sup>2</sup>)</b></td>')
+            report_html.write('    <td class="td_border" colspan="9">' +
+                              '{:,}'.format(self.building.bldg_area) + '</td>')
             report_html.write('  </tr>')
             report_html.write('  </table>')
             report_html.write('  <br>')
-            report_html.write('    <table class="w3-table w3-bordered w3-border" style="width:95% border: solid 1 px blue">')
+            report_html.write(
+                '    <table class="w3-table w3-bordered w3-border" style="width:95% border: solid 1 px blue">')
             report_html.write('  <tr>')
             report_html.write('    <td class="td_border" colspan="4"></td>')
-            report_html.write('    <td class="td_border" colspan="4"><b>Electricity</b></td>')
-            report_html.write('    <td class="td_border" colspan="4"><b>Fossil Fuel</b></td>')
+            report_html.write(
+                '    <td class="td_border" colspan="4"><b>Electricity</b></td>')
+            report_html.write(
+                '    <td class="td_border" colspan="4"><b>Fossil Fuel</b></td>')
             report_html.write('  </tr>')
             report_html.write('  <tr>')
-            report_html.write('    <td class="td_border" colspan="4"><b>Annual Consumption (kWh)</b></td>')
-            if(hasattr(self.building, 'recent_annual_electricity_kWh')):
-                report_html.write('    <td class="td_border" colspan="4">' + '{:,}'.format(self.building.recent_annual_electricity_kWh) + '</td>')
+            report_html.write(
+                '    <td class="td_border" colspan="4"><b>Annual Consumption (kWh)</b></td>')
+            if (hasattr(self.building, 'recent_annual_electricity_kWh')):
+                report_html.write('    <td class="td_border" colspan="4">' + '{:,}'.format(
+                    self.building.recent_annual_electricity_kWh) + '</td>')
             else:
-                report_html.write('    <td class="td_border" colspan="4">No electricity data</td>')
+                report_html.write(
+                    '    <td class="td_border" colspan="4">No electricity data</td>')
           #  report_html.write('    <td class="td_border" colspan="4"><b>Annual Fossil Fuel Consumption (kWh)</b></td>')
-            if(hasattr(self.building, 'recent_annual_fossil_fuel_kWh')):
-                report_html.write('    <td class="td_border" colspan="4">' + '{:,}'.format(self.building.recent_annual_fossil_fuel_kWh) + '</td>')
+            if (hasattr(self.building, 'recent_annual_fossil_fuel_kWh')):
+                report_html.write('    <td class="td_border" colspan="4">' + '{:,}'.format(
+                    self.building.recent_annual_fossil_fuel_kWh) + '</td>')
             else:
-                report_html.write('    <td class="td_border" colspan="4">No fossil fuel data</td>')
+                report_html.write(
+                    '    <td class="td_border" colspan="4">No fossil fuel data</td>')
             report_html.write('  </tr>')
             report_html.write('  <tr>')
-            report_html.write('    <td class="td_border" colspan="4"><b>Annual Cost (' + self.currency_str + ')</b></td>')
-            if(hasattr(self.building, 'recent_annual_electricity_cost')):
-                report_html.write('    <td class="td_border"  colspan="4">' + '{:,}'.format(self.building.recent_annual_electricity_cost) + '</td>')
+            report_html.write(
+                '    <td class="td_border" colspan="4"><b>Annual Cost (' + self.currency_str + ')</b></td>')
+            if (hasattr(self.building, 'recent_annual_electricity_cost')):
+                report_html.write('    <td class="td_border"  colspan="4">' + '{:,}'.format(
+                    self.building.recent_annual_electricity_cost) + '</td>')
             else:
-                report_html.write('    <td class="td_border"  colspan="4">No electricity data</td>')
+                report_html.write(
+                    '    <td class="td_border"  colspan="4">No electricity data</td>')
           #  report_html.write('    <td class="td_border" colspan="4"><b>Annual  Cost (' + self.currency_str + ')</b></td>')
-            if(hasattr(self.building, 'recent_annual_fossil_fuel_cost')):
-                report_html.write('    <td class="td_border"  colspan="4">' + '{:,}'.format(self.building.recent_annual_fossil_fuel_cost) + '</td>')
+            if (hasattr(self.building, 'recent_annual_fossil_fuel_cost')):
+                report_html.write('    <td class="td_border"  colspan="4">' + '{:,}'.format(
+                    self.building.recent_annual_fossil_fuel_cost) + '</td>')
             else:
-                report_html.write('    <td class="td_border"  colspan="4">No fossil fuel data</td>')
+                report_html.write(
+                    '    <td class="td_border"  colspan="4">No fossil fuel data</td>')
             report_html.write('  </tr>')
             report_html.write('  <tr>')
-            report_html.write('    <td class="td_border" colspan="4"><b>Annual Site EUI (kWh/m<sup>2</sup>)</b></td>')
-            if(hasattr(self.building, 'recent_annual_electricity_EUI')):
-                report_html.write('    <td class="td_border" colspan="4">' + '{:,}'.format(self.building.recent_annual_electricity_EUI) + '</td>')
+            report_html.write(
+                '    <td class="td_border" colspan="4"><b>Annual Site EUI (kWh/m<sup>2</sup>)</b></td>')
+            if (hasattr(self.building, 'recent_annual_electricity_EUI')):
+                report_html.write('    <td class="td_border" colspan="4">' + '{:,}'.format(
+                    self.building.recent_annual_electricity_EUI) + '</td>')
             else:
-                report_html.write('    <td class="td_border" colspan="4">No electricity data</td>')
+                report_html.write(
+                    '    <td class="td_border" colspan="4">No electricity data</td>')
           #  report_html.write('    <td class="td_border" colspan="4"><b>Annual Site EUI (kWh/m<sup>2</sup>)</b></td>')
-            if(hasattr(self.building,'recent_annual_fossil_fuel_EUI')):
-                report_html.write('    <td class="td_border" colspan="4">' + '{:,}'.format(self.building.recent_annual_fossil_fuel_EUI) + '</td>')
+            if (hasattr(self.building, 'recent_annual_fossil_fuel_EUI')):
+                report_html.write('    <td class="td_border" colspan="4">' + '{:,}'.format(
+                    self.building.recent_annual_fossil_fuel_EUI) + '</td>')
             else:
-                report_html.write('    <td class="td_border" colspan="4">No fossil fuel data</td>')
+                report_html.write(
+                    '    <td class="td_border" colspan="4">No fossil fuel data</td>')
             report_html.write('  </tr>')
             report_html.write('    </table>')
-            report_html.write('<p style="margin:0px;">&nbsp;&nbsp;<i>Note: The annual results are from the most recent 12 months\' input.</i></p>')
+            report_html.write(
+                '<p style="margin:0px;">&nbsp;&nbsp;<i>Note: The annual results are from the most recent 12 months\' input.</i></p>')
             report_html.write('</div>')
             report_html.write('</div>')
 
-
-            ### Saving Potentials Card
+            # Saving Potentials Card
             report_html.write('<br>')
-            report_html.write('  <div class="w3-container w3-padding-large w3-white">')
-            report_html.write('    <h2 id="about"><b>Saving Potentials</b></h2>')
+            report_html.write(
+                '  <div class="w3-container w3-padding-large w3-white">')
+            report_html.write(
+                '    <h2 id="about"><b>Saving Potentials</b></h2>')
             report_html.write('    <hr class="w3-opacity">')
 
-            report_html.write('<div class="w3-container w3-margin-bottom w3-col m12 w3-padding-small">')
+            report_html.write(
+                '<div class="w3-container w3-margin-bottom w3-col m12 w3-padding-small">')
             report_html.write('<div class="w3-container ">')
             # Savings plots start
             # Savings plot row 1 -- saving numbers and target
             report_html.write('<div class="w3-cell-row">')
             # Col 1 -- Saving numbers
-            report_html.write('<div class="w3-container w3-cell w3-hover-indigo w3-mobile">')
-            report_html.write('<p class="w3-xlarge">    Target Selection: ' + self.building.saving_target_str + '</p>')
+            report_html.write(
+                '<div class="w3-container w3-cell w3-hover-indigo w3-mobile">')
+            report_html.write('<p class="w3-xlarge">    Target Selection: ' +
+                              self.building.saving_target_str + '</p>')
             report_html.write('<p class="w3-xlarge">    Potential Cost Savings: </p><p class="number">' + self.currency_str + " {:,}".format(
                 int(self.building.total_cost_savings)) + '</p>')
             report_html.write('<p class="w3-xlarge">    Potential Percent Savings: </p><p class = "number">' + "{:,}".format(
                 self.building.total_energy_savings_pct) + '%</p>')
             report_html.write('</div>')
             # Col 2 -- EE recommendations
-            report_html.write('<div class="w3-container w3-hover-indigo w3-cell w3-mobile">')
-            report_html.write('<h5><b>Energy Efficiency Recommendations</b></h5>')
+            report_html.write(
+                '<div class="w3-container w3-hover-indigo w3-cell w3-mobile">')
+            report_html.write(
+                '<h5><b>Energy Efficiency Recommendations</b></h5>')
             report_html.write('<ul>')
             for i in range(len(self.building.FIM_list)):
                 report_html.write('<li>' + self.building.FIM_list[i] + '</li>')
@@ -231,22 +272,24 @@ class Report:
             report_html.write('''
                   <div class="w3-row">
                       <div class="w3-half">
-                      <p  class="w3-center"> <b> Utility Cost Breakdown (Thousands'''+ self.currency_str +''') </b> </p>
+                      <p  class="w3-center"> <b> Utility Cost Breakdown (Thousands''' + self.currency_str + ''') </b> </p>
                           <canvas id="disag" style="height:500px"></canvas>
                       </div>
                       <div  class="w3-half">
-                      <p  class="w3-center"><b> Utility Cost Savings ('''+ self.currency_str +''') </b></p>
+                      <p  class="w3-center"><b> Utility Cost Savings (''' + self.currency_str + ''') </b></p>
                           <canvas id="saving_pie_chart" style="height:500px"></canvas>
                       </div>
                   </div>''')
             report_html.write(self.saving_bar_str)
             report_html.write(self.saving_pie_str)
             report_html.write('<div class="w3-container w3-content">')
-            report_html.write('<hr><button class="w3-button w3-border w3-hover-grey" onclick="showTrends()">Show/Hide original and predicted consumption with upgrade</button>')
+            report_html.write(
+                '<hr><button class="w3-button w3-border w3-hover-grey" onclick="showTrends()">Show/Hide original and predicted consumption with upgrade</button>')
             report_html.write('</div>')
             # Savings plot row 3 -- hidden saving trend charts
-            report_html.write('<div class="w3-cell-row" id="trend_plot" style = "display:none">')
-            #report_html.write('<div class="w3-container w3-cell w3-mobile">')
+            report_html.write(
+                '<div class="w3-cell-row" id="trend_plot" style = "display:none">')
+            # report_html.write('<div class="w3-container w3-cell w3-mobile">')
             report_html.write('''
                 <div id="trend_plot" class = "w3-row-padding">
                       <div class ="w3-half">
@@ -256,11 +299,11 @@ class Report:
                             <canvas id="consumption_f"></canvas>
                       </div>
                 </div>''')
-            if(hasattr(self.building, 'energy_savings_fig_e')):
+            if (hasattr(self.building, 'energy_savings_fig_e')):
                 report_html.write(self.building.energy_savings_fig_e)
             else:
                 report_html.write('<p>No electricity data</p>')
-            if(hasattr(self.building, 'energy_savings_fig_f')):
+            if (hasattr(self.building, 'energy_savings_fig_f')):
                 report_html.write(self.building.energy_savings_fig_f)
             else:
                 report_html.write('<p>No fossil fuel data</p>')
@@ -269,15 +312,17 @@ class Report:
             # Savings plots end
             report_html.write('</div>')
             # EE recommendations brief
-            report_html.write('<div class="w3-container w3-margin-bottom w3-padding-small">')
+            report_html.write(
+                '<div class="w3-container w3-margin-bottom w3-padding-small">')
             report_html.write('</div>')
             report_html.write('</div>')
             report_html.write('<br>')
 
-
-            ### Weather Sensitivity and Benchmarks Card
-            report_html.write('  <div class="w3-container w3-padding-large w3-white" id="about">')
-            report_html.write('    <h2 id="benchmark"><b>Weather Sensitivity and Benchmarks</b></h2>')
+            # Weather Sensitivity and Benchmarks Card
+            report_html.write(
+                '  <div class="w3-container w3-padding-large w3-white" id="about">')
+            report_html.write(
+                '    <h2 id="benchmark"><b>Weather Sensitivity and Benchmarks</b></h2>')
             report_html.write('    <hr class="w3-opacity">')
             report_html.write(
                 "Daily electricity and fossil fuel  use per floor area is plotted below against monthly average outdoor air temperature. When energy use goes up at low temperatures on the left side of the graph, it represents heating energy. When energy use goes up at high temperatures on the right side of the graph, it represents cooling energy. The flat part of the graph shows the building's base load.")
@@ -285,36 +330,44 @@ class Report:
 
             # Electricity model and benchmarking
             report_html.write('<div class="w3-row">')
-            if(hasattr(self.building,'im_electricity') and hasattr(self.building.im_electricity, 'model_description_html')):
-                report_html.write(self.building.im_electricity.model_description_html)
+            if (hasattr(self.building, 'im_electricity') and hasattr(self.building.im_electricity, 'model_description_html')):
+                report_html.write(
+                    self.building.im_electricity.model_description_html)
             report_html.write('</div>')
             report_html.write('<div class="w3-row">')
-            report_html.write('  <div class="w3-half w3-container w3-margin-bottom w3-col m5 w3-padding-small">')
+            report_html.write(
+                '  <div class="w3-half w3-container w3-margin-bottom w3-col m5 w3-padding-small">')
             report_html.write('    <div class="w3-container ">')
-            report_html.write('      <p><b>Electricity Change-point Model</b></p>')
+            report_html.write(
+                '      <p><b>Electricity Change-point Model</b></p>')
             if (hasattr(self.building, 'im_electricity') and hasattr(self.building.im_electricity, 'model_description_html')):
                 # report_html.write(self.building.im_electricity.fig_html)
                 report_html.write('<div class="graph_container"> ')
-                report_html.write('<canvas id="e_model" style="height:240px;"></canvas>')
+                report_html.write(
+                    '<canvas id="e_model" style="height:240px;"></canvas>')
                 report_html.write('</div>')
-                report_html.write(self.building.im_electricity.model_chart_html)
+                report_html.write(
+                    self.building.im_electricity.model_chart_html)
 
             else:
                 report_html.write(
                     '<p>No electricity consumption data is provided or no significant change-point model for electricity was found.</p>')
             report_html.write('    </div>')
             report_html.write('  </div>')
-            report_html.write('<div class="w3-half w3-container w3-margin-bottom w3-col m7 w3-padding-small">')
-            #report_html.write('<div class="w3-container ">')
-            report_html.write('<p><b>Electricity Consumption Benchmarking</b></p>')
+            report_html.write(
+                '<div class="w3-half w3-container w3-margin-bottom w3-col m7 w3-padding-small">')
+            # report_html.write('<div class="w3-container ">')
+            report_html.write(
+                '<p><b>Electricity Consumption Benchmarking</b></p>')
             report_html.write(self.building.benchmarking_bar_base_e_html)
             report_html.write(self.building.benchmarking_bar_hsl_e_html)
             report_html.write(self.building.benchmarking_bar_hcp_e_html)
             report_html.write(self.building.benchmarking_bar_csl_e_html)
             report_html.write(self.building.benchmarking_bar_ccp_e_html)
-            report_html.write('<p><i>Note: % indicate the percentage of buildings your building is superior to.</i></p>')
             report_html.write(
-                 '<a href="#IMT" onclick="w3_close()" class="w3-bar-item w3-button w3-padding"><i class="fa fa-th-large fa-info w3-margin-right"></i>Details</a> ')
+                '<p><i>Note: % indicate the percentage of buildings your building is superior to.</i></p>')
+            report_html.write(
+                '<a href="#IMT" onclick="w3_close()" class="w3-bar-item w3-button w3-padding"><i class="fa fa-th-large fa-info w3-margin-right"></i>Details</a> ')
             report_html.write('</div>')
             report_html.write('</div>')
             # -->Electricity model and benchmarking end
@@ -323,35 +376,43 @@ class Report:
             # Fossil fuel model and benchmarking
             report_html.write('<div class="w3-row">')
             if (hasattr(self.building, 'im_fossil_fuel') and hasattr(self.building.im_fossil_fuel, 'model_description_html')):
-                report_html.write(self.building.im_fossil_fuel.model_description_html)
+                report_html.write(
+                    self.building.im_fossil_fuel.model_description_html)
             report_html.write('</div>')
             report_html.write('<div class="w3-row">')
-            report_html.write('  <div class="w3-half w3-container w3-margin-bottom w3-col m5 w3-padding-small">')
+            report_html.write(
+                '  <div class="w3-half w3-container w3-margin-bottom w3-col m5 w3-padding-small">')
             report_html.write('    <div class="w3-container">')
-            report_html.write('      <p><b>Fossil Fuel Change-point Model</b></p>')
+            report_html.write(
+                '      <p><b>Fossil Fuel Change-point Model</b></p>')
             if (hasattr(self.building, 'im_fossil_fuel') and hasattr(self.building.im_fossil_fuel, 'model_description_html')):
-                #report_html.write(self.building.im_fossil_fuel.fig_html)
+                # report_html.write(self.building.im_fossil_fuel.fig_html)
                 report_html.write('<div class="graph_container"> ')
-                report_html.write('<canvas id="f_model" style="height:240px;"></canvas>')
+                report_html.write(
+                    '<canvas id="f_model" style="height:240px;"></canvas>')
                 report_html.write('</div>')
-                report_html.write(self.building.im_fossil_fuel.model_chart_html)
+                report_html.write(
+                    self.building.im_fossil_fuel.model_chart_html)
 
             else:
                 report_html.write(
                     '<p>No fossil fuel consumption data is provided or no significant change-point model for fossil fuel was found.</p>')
             report_html.write('    </div>')
             report_html.write('  </div>    ')
-            report_html.write('<div class="w3-half w3-container w3-margin-bottom w3-col m7 w3-padding-small">')
+            report_html.write(
+                '<div class="w3-half w3-container w3-margin-bottom w3-col m7 w3-padding-small">')
             report_html.write('<div class="w3-container">')
-            report_html.write('<p><b>Fossil Fuel Consumption Benchmarking</b></p>')
+            report_html.write(
+                '<p><b>Fossil Fuel Consumption Benchmarking</b></p>')
             report_html.write(self.building.benchmarking_bar_base_f_html)
             report_html.write(self.building.benchmarking_bar_hsl_f_html)
             report_html.write(self.building.benchmarking_bar_hcp_f_html)
             report_html.write(self.building.benchmarking_bar_csl_f_html)
             report_html.write(self.building.benchmarking_bar_ccp_f_html)
-            report_html.write('<p><i>Note: % indicate the percentage of buildings your building is superior to.</i></p>')
             report_html.write(
-                 '<a href="#IMT" onclick="w3_close()" class="w3-bar-item w3-button w3-padding"><i class="fa fa-th-large fa-info w3-margin-right"></i>Details</a> ')
+                '<p><i>Note: % indicate the percentage of buildings your building is superior to.</i></p>')
+            report_html.write(
+                '<a href="#IMT" onclick="w3_close()" class="w3-bar-item w3-button w3-padding"><i class="fa fa-th-large fa-info w3-margin-right"></i>Details</a> ')
             report_html.write('</div>')
             report_html.write('</div>')
             report_html.write('</div>')
@@ -361,9 +422,12 @@ class Report:
             report_html.write('  <br>')
 
             # Detail EE analysis
-            report_html.write('  <div class="w3-container w3-padding-large w3-white">')
-            report_html.write('    <h2 id="EE"><b>Energy Efficiency Recommendation Details</b></h2>')
-            report_html.write('    <p>More details on each energy efficiency opportunity identified </p>')
+            report_html.write(
+                '  <div class="w3-container w3-padding-large w3-white">')
+            report_html.write(
+                '    <h2 id="EE"><b>Energy Efficiency Recommendation Details</b></h2>')
+            report_html.write(
+                '    <p>More details on each energy efficiency opportunity identified </p>')
             FIM_des = {
                 "Reduce Equipment Schedules": "Your building equipment load is higher than typical. Equipment and systems within any building should operate using a schedule. Check equipment schedule and if equipment is operational during low occupancy times or during reduced building use. Setup a notification to identify when schedules are overridden and are not returned to normal.",
                 "Reduce Lighting Load": "Your building lighting load is higher than typical. Lighting load is an ample portion of any building energy consumption. Lighting efficiency and controls have big impact on lighting system performance. Consider upgrading bulbs and fixtures to improve efficiency and check existing (or upgrade to) controls that dim and turn off the lights appropriately. Take advantage of natural daylighting whenever possible. Lights near existing window or skylights can be controlled to dim or turn off for maximum daylight utilization. Renovations to the building envelope and internal space configurations are good opportunity to check lighting system performance. ",
@@ -377,21 +441,25 @@ class Report:
                 "Check Fossil Baseload": "Your building thermal load is higher than typical. Check building thermal baseload (minimum continuous usage) for the building. Poor operating schedules, simultaneous heating and cooling, and faulty heating equipment result in higher baseload.",
                 "Upgrade Windows": "Windows have big impact on heating and cooling loads. Poor window insulation is like low insulation wall. Check current windows for U-value.",
                 "Eliminate Electric Heating": "Your building electric heating load is higher than typical. Electric heating is expensive and increases heating system energy consumption. Check electric heating system schedules and controls. ",
-                "Increase Cooling Setpoints" : "Your building starts cooling at lower temperature than typical. Check the occupied and unoccupied cooling setpoint during the cooling season. Cooling system and auxiliaries’ energy consumption will be reduced by increasing the cooling setpoint ",
-                "Add/Fix Economizers":"Utilizing outside air that is cooler and/or drier than indoor air in an economizer can significantly reduce the energy used to cool the building. Check existing economizers, if any, for efficient operations."
+                "Increase Cooling Setpoints": "Your building starts cooling at lower temperature than typical. Check the occupied and unoccupied cooling setpoint during the cooling season. Cooling system and auxiliaries’ energy consumption will be reduced by increasing the cooling setpoint ",
+                "Add/Fix Economizers": "Utilizing outside air that is cooler and/or drier than indoor air in an economizer can significantly reduce the energy used to cool the building. Check existing economizers, if any, for efficient operations."
 
             }
             for i in range(len(self.building.FIM_list)):
                 report_html.write('<h4>' + self.building.FIM_list[i] + '</h4>')
-                report_html.write('<p>' + FIM_des[self.building.FIM_list[i]] + '</p>')
+                report_html.write(
+                    '<p>' + FIM_des[self.building.FIM_list[i]] + '</p>')
 
-            report_html.write('<p><i>Note: Special thanks to Johnson Controls (JCI) technical team for their valuable technical support and for their algorithm in identifying Energy Efficiency Recommendations.</i></p>')
+            report_html.write(
+                '<p><i>Note: Special thanks to Johnson Controls (JCI) technical team for their valuable technical support and for their algorithm in identifying Energy Efficiency Recommendations.</i></p>')
             report_html.write('    <hr class="w3-opacity">')
             report_html.write('  </div>')
             report_html.write('  <br>')
 
-            report_html.write('  <div class="w3-container w3-padding-large w3-white">')
-            report_html.write('    <h2 id="IMT"><b>Understand the Model</b></h2>')
+            report_html.write(
+                '  <div class="w3-container w3-padding-large w3-white">')
+            report_html.write(
+                '    <h2 id="IMT"><b>Understand the Model</b></h2>')
             report_html.write("""
                 <h4>Baseload</h4>
                 <p>Energy consumption of all non-weather-related equipment like computers and lighting. The lower the baseload, the less the energy consumed in plugs and permanently plugged equipment.</p>
@@ -413,7 +481,8 @@ class Report:
             report_html.write('  <br>')
 
             # Tool description
-            report_html.write('  <div class="w3-container w3-padding-large w3-white">')
+            report_html.write(
+                '  <div class="w3-container w3-padding-large w3-white">')
             report_html.write('    <h2 id="About"><b>What is BETTER?</b></h2>')
             report_html.write(
                 "  <p>The Building Efficiency Targeting Tool for Energy Retrofits (BETTER) helps building owners and managers quickly assess potential opportunities for energy savings, to inform decisions on where to target energy efficiency efforts. The tool can identify low and no-cost opportunities that can be implemented immediately, as well as retrofit opportunities that can be investigated further through more detailed audits or studies.</p>")
@@ -425,7 +494,8 @@ class Report:
             report_html.write('  <br>')
 
             report_html.write('  <!-- Footer -->')
-            report_html.write('  <footer class="w3-container w3-padding-32 w3-white">')
+            report_html.write(
+                '  <footer class="w3-container w3-padding-32 w3-white">')
             report_html.write('  <div class="w3-row-padding">')
             report_html.write('    <div class="w3-half">')
             report_html.write('      <h3>Partners</h3>')
@@ -438,28 +508,35 @@ class Report:
             report_html.write('      <h3>Links</h3>')
             report_html.write('      <ul class="w3-ul w3-hoverable">')
             report_html.write('        <li class="w3-padding-16">')
-            report_html.write('          <span class="w3-large"><a href="https://github.com/LBNL-JCI-ICF/better">GitHub Repository</a></span><br>')
+            report_html.write(
+                '          <span class="w3-large"><a href="https://github.com/LBNL-JCI-ICF/better">GitHub Repository</a></span><br>')
             report_html.write('        </li>')
             report_html.write('      </ul>')
             report_html.write('    </div>')
             report_html.write('  </div>')
             report_html.write('  </footer>')
 
-            report_html.write('  <div class="w3-black w3-center w3-padding-24"></div>')
+            report_html.write(
+                '  <div class="w3-black w3-center w3-padding-24"></div>')
             report_html.write('</div>')
             report_html.write('<script>')
             report_html.write('function w3_open() {')
-            report_html.write('    document.getElementById("mySidebar").style.display = "block";')
-            report_html.write('    document.getElementById("myOverlay").style.display = "block";')
+            report_html.write(
+                '    document.getElementById("mySidebar").style.display = "block";')
+            report_html.write(
+                '    document.getElementById("myOverlay").style.display = "block";')
             report_html.write('}')
             report_html.write('function w3_close() {')
-            report_html.write('    document.getElementById("mySidebar").style.display = "none";')
-            report_html.write('    document.getElementById("myOverlay").style.display = "none";')
+            report_html.write(
+                '    document.getElementById("mySidebar").style.display = "none";')
+            report_html.write(
+                '    document.getElementById("myOverlay").style.display = "none";')
             report_html.write('}')
 
             # Show/hide trends
             report_html.write('function showTrends() {')
-            report_html.write('    var x = document.getElementById("trend_plot");')
+            report_html.write(
+                '    var x = document.getElementById("trend_plot");')
             report_html.write('    if (x.style.display === "none") {')
             report_html.write('        x.style.display = "block";')
             report_html.write('    } else {')
@@ -470,14 +547,13 @@ class Report:
             report_html.write('</script>')
             report_html.write('</body>')
             report_html.write('</html>')
-        return(report_file)
+        return (report_file)
 
     def logo(self):
         self.cerc_logo = '<a href="https://cercbee.lbl.gov/"><img src="https://cercbee.lbl.gov/sites/default/files/styles/max_image/public/images/cerc_logo.jpg?itok=HE_BbWn3" style="height:220px;"></a>'
         self.lbl_logo = '<a href="https://www.lbl.gov/"><img src="https://creative.lbl.gov/wp-content/uploads/sites/23/2015/05/Berkeley_Lab_Logo_Large.png" style="height:100px;"></a>'
         self.icf_logo = '<a href="https://www.icf.com/"><img src="https://upload.wikimedia.org/wikipedia/commons/2/29/ICF_International_logo.png" style="height:100px;"></a>'
         self.jci_logo = '<a href="https://www.johnsoncontrols.com/"><img src="https://upload.wikimedia.org/wikipedia/en/thumb/0/0f/Johnson_Controls.svg/250px-Johnson_Controls.svg.png" style="height:100px;"></a>'
-
 
     def charts_js(self):
         # Horizontal bar chart
@@ -493,7 +569,7 @@ class Report:
                         enabled: true,
                         callbacks: {
                             label: function(tooltipItem, data) {
-                                return Math.round(tooltipItem.xLabel).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")+" '''+ self.currency_str +'''"
+                                return Math.round(tooltipItem.xLabel).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")+" ''' + self.currency_str + '''"
                             },
                         }
                     },
@@ -576,7 +652,7 @@ class Report:
                       labels: ["Cooling", "Baseload", "Heating"],
                       datasets: [
                       {
-                          label: "Utility Cost Savings ('''+ self.currency_str +''')",
+                          label: "Utility Cost Savings (''' + self.currency_str + ''')",
                           backgroundColor: ["rgba(31,78,121,1)", "rgba(127,127,127,1)", "rgba(192,0,0,1)"],
                           data: ['''+str(self.building.cooling_old_cost - self.building.cooling_new_cost)+''',
                                  '''+str(self.building.base_old_cost - self.building.base_new_cost)+''',
@@ -595,7 +671,7 @@ class Report:
                             var dataset = data.datasets[tooltipItem.datasetIndex];
                             var meta = dataset._meta[Object.keys(dataset._meta)[0]];
                             var total = meta.total;
-                            var currentValue = Math.round(data.datasets[0].data[tooltipItem.index]).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")+' '''+ self.currency_str +'''';
+                            var currentValue = Math.round(data.datasets[0].data[tooltipItem.index]).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")+' ''' + self.currency_str + '''';
                             var percentage = parseFloat((dataset.data[tooltipItem.index]/total*100).toFixed(1));
                             return currentValue + ' (' + percentage + '%)';
                         },
@@ -610,7 +686,6 @@ class Report:
         '''
 
         # print(self.saving_pie_str)
-
 
     @staticmethod
     def add_3d_scatter_trace(name, v_x, v_y, v_z, info, v_s, c_str):
@@ -648,7 +723,6 @@ class Report:
         trace_str += ','
         return (trace_str)
 
-
     @staticmethod
     def add_2d_scatter_trace(name, v_x, v_y, v_info, v_s, c_str):
         import math
@@ -683,7 +757,6 @@ class Report:
         trace_str += ','
         return (trace_str)
 
-
     @staticmethod
     def add_2d_scatter_plot(df_summary):
         div_id_1 = 'cost_saving_bubble_plot'
@@ -705,20 +778,25 @@ class Report:
             window.PLOTLYENV.BASE_URL = "https://plot.ly";
             Plotly.newPlot("'''+div_id_2+'''", ['''
 
-        v_rgb_str = np.random.choice(constants.Constants.rgb_color_strs, replace=False)
+        v_rgb_str = np.random.choice(
+            constants.Constants.rgb_color_strs, replace=False)
 
         # Re-scale the bubble sizes.
-        v_cost_savings = df_summary['Building Annual Energy Cost Savings ($)'] # Bubble size by absolute cost savings ($)
-        v_pct_savings = df_summary['Building Annual Energy Saving (%)'] # Bubble size by energy saving percentages (%)
+        # Bubble size by absolute cost savings ($)
+        v_cost_savings = df_summary['Building Annual Energy Cost Savings ($)']
+        # Bubble size by energy saving percentages (%)
+        v_pct_savings = df_summary['Building Annual Energy Saving (%)']
 
         delta_1 = max(v_cost_savings) - min(v_cost_savings)
         delta_2 = max(v_pct_savings) - min(v_pct_savings)
 
-        df_summary['Bubble Size 1'] = [round(((x - min(v_cost_savings)) + 0.5*delta_1)/delta_1*15, 1) * 1.5  for x in v_cost_savings]
-        df_summary['Bubble Size 2'] = [round(((x - min(v_pct_savings)) + 0.5*delta_2)/delta_2*15, 1) * 1.5  for x in v_pct_savings]
+        df_summary['Bubble Size 1'] = [round(
+            ((x - min(v_cost_savings)) + 0.5*delta_1)/delta_1*15, 1) * 1.5 for x in v_cost_savings]
+        df_summary['Bubble Size 2'] = [round(
+            ((x - min(v_pct_savings)) + 0.5*delta_2)/delta_2*15, 1) * 1.5 for x in v_pct_savings]
 
         for i, building_id in enumerate(v_building_ids):
-            df_temp = df_summary.loc[df_summary['Building ID']==building_id]
+            df_temp = df_summary.loc[df_summary['Building ID'] == building_id]
             location = df_temp.iloc[0]['Building Address']
 
             v_x = df_temp['Building Annual Electricity EUI (kWh/m2)']
@@ -727,17 +805,29 @@ class Report:
             v_s_2 = df_temp['Bubble Size 2']
 
             v_info = 'Building ID: ' + str(df_temp['Building ID'][i]) + ' <br>'
-            v_info += 'Building Location: ' + str(df_temp['Building Address'][i]) + ' <br>'
-            v_info += 'Annual electricity EUI : ' + str(df_temp['Building Annual Electricity EUI (kWh/m2)'][i]) + ' (kWh/m<sup>2</sup>) <br>'
-            v_info += 'Annual fossil fuel EUI : ' + str(df_temp['Building Annual Fossil Fuel EUI (kWh/m2)'][i]) + ' (kWh/m<sup>2</sup>) <br>'
-            v_info += 'Potential cost savings: $' + '{:,}'.format(df_temp['Building Annual Energy Cost Savings ($)'][i]) + ' <br>'
-            v_info += 'Potential energy savings: ' + str(df_temp['Building Annual Energy Saving (%)'][i]) + '%'
+            v_info += 'Building Location: ' + \
+                str(df_temp['Building Address'][i]) + ' <br>'
+            v_info += 'Annual electricity EUI : ' + \
+                str(df_temp['Building Annual Electricity EUI (kWh/m2)']
+                    [i]) + ' (kWh/m<sup>2</sup>) <br>'
+            v_info += 'Annual fossil fuel EUI : ' + \
+                str(df_temp['Building Annual Fossil Fuel EUI (kWh/m2)']
+                    [i]) + ' (kWh/m<sup>2</sup>) <br>'
+            v_info += 'Potential cost savings: $' + \
+                '{:,}'.format(
+                    df_temp['Building Annual Energy Cost Savings ($)'][i]) + ' <br>'
+            v_info += 'Potential energy savings: ' + \
+                str(df_temp['Building Annual Energy Saving (%)'][i]) + '%'
 
             c_str_1 = 'rgb(0, 51, 102)'
             c_str_2 = 'rgb(0, 51, 102)'
 
-            cost_scatter_html +=  '\n' + Report.add_2d_scatter_trace(location, v_x, v_y, v_info, v_s_1, c_str_1)
-            pct_scatter_html +=  '\n' + Report.add_2d_scatter_trace(location, v_x, v_y, v_info, v_s_2, c_str_2)
+            cost_scatter_html += '\n' + \
+                Report.add_2d_scatter_trace(
+                    location, v_x, v_y, v_info, v_s_1, c_str_1)
+            pct_scatter_html += '\n' + \
+                Report.add_2d_scatter_trace(
+                    location, v_x, v_y, v_info, v_s_2, c_str_2)
 
         cost_scatter_html += '''
             ],
@@ -787,16 +877,17 @@ class Report:
 
         return (cost_scatter_html, pct_scatter_html)
 
-
     def generate_portfolio_report(self, report_path):
         report_file = report_path + str(self.portfolio.name) + '_report.html'
         with open(report_file, 'w', encoding="utf-8") as report_html:
             report_html.write('<!DOCTYPE html>')
             report_html.write('<html>')
-            report_html.write('<title>Building Efficiency Targeting Tool for Energy Retrofits (BETTER) Report</title>')
+            report_html.write(
+                '<title>Building Efficiency Targeting Tool for Energy Retrofits (BETTER) Report</title>')
             report_html.write(self.html_basic())
 
-            report_html.write('<body class="w3-light-grey w3-content" style="max-width:1500px">')
+            report_html.write(
+                '<body class="w3-light-grey w3-content" style="max-width:1500px">')
 
             # Navigation bar
             report_html.write(self.navigation_bar())
@@ -847,24 +938,24 @@ class Report:
             </div><br>
             ''')
 
-
             # Portfolio summary charts card
-            scatter_html = self.add_2d_scatter_plot(self.portfolio.df_bldg_summary)[0]
+            scatter_html = self.add_2d_scatter_plot(
+                self.portfolio.df_bldg_summary)[0]
             report_html.write('''
             <div class="w3-container w3-padding-large w3-white"> <h2 id="about"><b>Benchmarking</b></h2>
                 <hr class="w3-opacity">
                 <div class="w3-container w3-margin-bottom w3-col m12 w3-padding-small">
                     <div class="w3-container ">
 
-                        ''' + 
-                            ''' The chart below shows the energy use intensities and savings potentials of each building in your portfolio. 
+                        ''' +
+                              ''' The chart below shows the energy use intensities and savings potentials of each building in your portfolio. 
                             The X-axis represents annual electricity use intensity, and the Y-axis represents annual fossil fuel energy use intensity. 
                             If your building is all-electric, it will sit somewhere at the bottom of the chart, since fossil fuel EUI will be zero. 
                             Bubble size indicates the potential utility cost savings in US dollars – the bigger the bubble, the higher that building’s savings potential.
                             
                             Hover your cursor over each bubble to display key stats about each building, including its ID from the Portfolio input spreadsheet, its location, 
                             its annual electricity and fossil fuel EUI, its potential cost savings, and its potential energy savings percentage. '''
-                        + '''<br>
+                              + '''<br>
 
                         ''' + scatter_html + '''
                     </div>
@@ -887,13 +978,13 @@ class Report:
             #     <div class="w3-container w3-margin-bottom w3-col m12 w3-padding-small">
             #         <div class="w3-container ">
 
-            #             ''' + 
-            #                 ''' The chart below shows the energy use intensities and savings potentials of each building in your portfolio. 
-            #                 The X-axis represents annual electricity use intensity, and the Y-axis represents annual fossil fuel energy use intensity. 
-            #                 If your building is all-electric, it will sit somewhere at the bottom of the chart, since fossil fuel EUI will be zero. 
+            #             ''' +
+            #                 ''' The chart below shows the energy use intensities and savings potentials of each building in your portfolio.
+            #                 The X-axis represents annual electricity use intensity, and the Y-axis represents annual fossil fuel energy use intensity.
+            #                 If your building is all-electric, it will sit somewhere at the bottom of the chart, since fossil fuel EUI will be zero.
             #                 Bubble size indicates the potential utility cost savings in US dollars – the bigger the bubble, the higher that building’s savings potential.
-                            
-            #                 Hover your cursor over each bubble to display key stats about each building, including its ID from the Portfolio input spreadsheet, its location, 
+
+            #                 Hover your cursor over each bubble to display key stats about each building, including its ID from the Portfolio input spreadsheet, its location,
             #                 its annual electricity and fossil fuel EUI, its potential cost savings, and its potential energy savings percentage. '''
             #             + '''<br>
 
@@ -910,25 +1001,39 @@ class Report:
             tbstr += '    <thead>\n'
             tbstr += '      <tr style=" text-align: right;">\n'
             for col_name in self.portfolio.df_bldg_summary.columns:
-                if col_name != 'Detail Report' and not col_name.startswith('Bubble Size'): 
+                if col_name != 'Detail Report' and not col_name.startswith('Bubble Size'):
                     tbstr += '          <th>' + col_name + '</th>\n'
             tbstr += '      </tr>\n'
             tbstr += '    </thead>\n'
             tbstr += '    <tbody>\n'
             for n in range(0, len(self.portfolio.df_bldg_summary.axes[0])):
                 tbstr += '        <tr>\n'
-                tbstr += '            <td><a href=' + report_path + str(self.portfolio.df_bldg_summary['Detail Report'][n]) + '>' + str(self.portfolio.df_bldg_summary['Building ID'][n]) + '</a></td>\n'
-                tbstr += '            <td>' + self.portfolio.df_bldg_summary['Building Name'][n] + '</td>\n'
-                tbstr += '            <td>' + self.portfolio.df_bldg_summary['Building Address'][n] + '</td>\n'
-                tbstr += '            <td>' + self.format_number(self.portfolio.df_bldg_summary['Building Area (m2)'][n]) + '</td>\n'
-                tbstr += '            <td>' + self.format_number(self.portfolio.df_bldg_summary['Building Annual Electricity Consumption (kWh)'][n]) + '</td>\n'
-                tbstr += '            <td>' + self.format_number(self.portfolio.df_bldg_summary['Building Annual Fossil Fuel Consumption (kWh)'][n]) + '</td>\n'
-                tbstr += '            <td>' + self.format_number(self.portfolio.df_bldg_summary['Building Annual Electricity Cost ($)'][n]) + '</td>\n'
-                tbstr += '            <td>' + self.format_number(self.portfolio.df_bldg_summary['Building Annual Fossil Fuel Cost ($)'][n]) + '</td>\n'
-                tbstr += '            <td>' + self.format_number(self.portfolio.df_bldg_summary['Building Annual Electricity EUI (kWh/m2)'][n]) + '</td>\n'
-                tbstr += '            <td>' + self.format_number(self.portfolio.df_bldg_summary['Building Annual Fossil Fuel EUI (kWh/m2)'][n]) + '</td>\n'
-                tbstr += '            <td>' + self.format_number(self.portfolio.df_bldg_summary['Building Annual Energy Cost Savings ($)'][n]) + '</td>\n'
-                tbstr += '            <td>' + self.format_number(self.portfolio.df_bldg_summary['Building Annual Energy Saving (%)'][n]) + '</td>\n'
+                tbstr += '            <td><a href=' + report_path + \
+                    str(self.portfolio.df_bldg_summary['Detail Report'][n]) + '>' + str(
+                        self.portfolio.df_bldg_summary['Building ID'][n]) + '</a></td>\n'
+                tbstr += '            <td>' + \
+                    self.portfolio.df_bldg_summary['Building Name'][n] + '</td>\n'
+                tbstr += '            <td>' + \
+                    self.portfolio.df_bldg_summary['Building Address'][n] + '</td>\n'
+                tbstr += '            <td>' + \
+                    self.format_number(
+                        self.portfolio.df_bldg_summary['Building Area (m2)'][n]) + '</td>\n'
+                tbstr += '            <td>' + self.format_number(
+                    self.portfolio.df_bldg_summary['Building Annual Electricity Consumption (kWh)'][n]) + '</td>\n'
+                tbstr += '            <td>' + self.format_number(
+                    self.portfolio.df_bldg_summary['Building Annual Fossil Fuel Consumption (kWh)'][n]) + '</td>\n'
+                tbstr += '            <td>' + self.format_number(
+                    self.portfolio.df_bldg_summary['Building Annual Electricity Cost ($)'][n]) + '</td>\n'
+                tbstr += '            <td>' + self.format_number(
+                    self.portfolio.df_bldg_summary['Building Annual Fossil Fuel Cost ($)'][n]) + '</td>\n'
+                tbstr += '            <td>' + self.format_number(
+                    self.portfolio.df_bldg_summary['Building Annual Electricity EUI (kWh/m2)'][n]) + '</td>\n'
+                tbstr += '            <td>' + self.format_number(
+                    self.portfolio.df_bldg_summary['Building Annual Fossil Fuel EUI (kWh/m2)'][n]) + '</td>\n'
+                tbstr += '            <td>' + self.format_number(
+                    self.portfolio.df_bldg_summary['Building Annual Energy Cost Savings ($)'][n]) + '</td>\n'
+                tbstr += '            <td>' + self.format_number(
+                    self.portfolio.df_bldg_summary['Building Annual Energy Saving (%)'][n]) + '</td>\n'
                 tbstr += '        </tr>\n'
             tbstr += '    </tbody>\n'
             tbstr += '</table>\n'
@@ -938,13 +1043,13 @@ class Report:
                 <div class="w3-container w3-margin-bottom w3-col m12 w3-padding-small">
                     <div class="w3-container ">
                         
-                        ''' + 
-                            ''' The table below lists key building information for all buildings in your portfolio, including energy consumption, 
+                        ''' +
+                              ''' The table below lists key building information for all buildings in your portfolio, including energy consumption, 
                             energy cost, and saving potentials. Click on the table headers to sort the buildings according to that metric (for example, 
                             clicking on “Building Annual Energy Cost Savings” will sort the buildings from lowest to highest cost savings potential, 
                             and clicking again will sort from highest to lowest).
                             For detailed analysis results of a single building, click on the link in the “Building ID” column for that building. '''
-                        + ''' <br>
+                              + ''' <br>
                         ''' + tbstr + '''
                     </div>
                 </div>
@@ -954,7 +1059,8 @@ class Report:
 
             # Footer card
             report_html.write('  <!-- Footer -->')
-            report_html.write('  <footer class="w3-container w3-padding-32 w3-white">')
+            report_html.write(
+                '  <footer class="w3-container w3-padding-32 w3-white">')
             report_html.write('  <div class="w3-row-padding">')
             report_html.write('    <div class="w3-half">')
             report_html.write('      <h3>Partners</h3>')
@@ -967,19 +1073,21 @@ class Report:
             report_html.write('      <h3>Links</h3>')
             report_html.write('      <ul class="w3-ul w3-hoverable">')
             report_html.write('        <li class="w3-padding-16">')
-            report_html.write('          <span class="w3-large"><a href="https://github.com/LBNL-CERC-BEE/CERC-BEE-Virtual-Energy-Efficiency-Targeting-Tool">GitHub Repository</a></span><br>')
+            report_html.write(
+                '          <span class="w3-large"><a href="https://github.com/LBNL-CERC-BEE/CERC-BEE-Virtual-Energy-Efficiency-Targeting-Tool">GitHub Repository</a></span><br>')
             report_html.write('        </li>')
             report_html.write('      </ul>')
             report_html.write('    </div>')
             report_html.write('  </div>')
             report_html.write('  </footer>')
-            report_html.write('  <div class="w3-black w3-center w3-padding-24"></div>')
-
+            report_html.write(
+                '  <div class="w3-black w3-center w3-padding-24"></div>')
 
             report_html.write('<script>')
             # Show/hide trends
             report_html.write('function showTrends() {')
-            report_html.write('    var x = document.getElementById("bubble_plot");')
+            report_html.write(
+                '    var x = document.getElementById("bubble_plot");')
             report_html.write('    if (x.style.display === "none") {')
             report_html.write('        x.style.display = "block";')
             report_html.write('    } else {')
@@ -999,8 +1107,5 @@ class Report:
             ''')
 
             report_html.write('</html>')
-
-
-
 
         return

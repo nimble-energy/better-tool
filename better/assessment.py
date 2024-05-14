@@ -7,126 +7,131 @@ If you have questions about your rights to use or distribute this software, plea
 NOTICE.  This Software was developed under funding from the U.S. Department of Energy and the U.S. Government consequently retains certain rights. As such, the U.S. Government has been granted for itself and others acting on its behalf a paid-up, nonexclusive, irrevocable, worldwide license in the Software to reproduce, distribute copies to the public, prepare derivative works, and perform publicly and display publicly, and to permit other to do so. 
 
 '''
-
+from typing import Literal
 import pandas as pd
 import numpy as np
-import copy
-
-import constants
 
 
-# Modified by Han Li on 2018-7-31 for the open source tool
-class LEAN_FIMs:
-    def __init__(self, df_assessment, utility_type):
-        self.df_assessment = copy.deepcopy(df_assessment)
+class OpportunityEngine:
+    def __init__(self,
+                 benchmark_stats: dict,
+                 utility_type: Literal['electric', 'fossil_fuel']):
+
+        self.benchmark_stats = benchmark_stats
         self.utility_type = utility_type
-        self.utility_type_str = 'Electricity' if (utility_type == 1) else 'Fossil Fuel'
-        self.base = self.df_assessment.site_coefficients.beta_base
-        self.cdd = self.df_assessment.site_coefficients.beta_cdd
-        self.betc = self.df_assessment.site_coefficients.beta_betc
-        self.hdd = self.df_assessment.site_coefficients.beta_hdd
-        self.beth = self.df_assessment.site_coefficients.beta_beth
 
-        # Adapt the model coefficients to the LEAN_FIMs module
-        if self.betc == self.beth:
-            if self.cdd == 0:
-                self.betc, self.cdd  = np.nan, np.nan
-            if self.hdd == 0:
-                self.beth, self.hdd = np.nan, np.nan
+        # Adapt the model coefficients to the OpportunityEngine module
+        if self.benchmark_stats['beta_betc']['site_coefficient'] == self.benchmark_stats['beta_beth']['site_coefficient']:
+            if self.benchmark_stats['beta_cdd']['site_coefficient'] == 0:
+                self.benchmark_stats['beta_betc']['site_coefficient'] = np.nan
+                self.benchmark_stats['beta_cdd']['site_coefficient'] = np.nan
+            if self.benchmark_stats['beta_hdd']['site_coefficient'] == 0:
+                self.benchmark_stats['beta_beth']['site_coefficient'] = np.nan
+                self.benchmark_stats['beta_hdd']['site_coefficient'] = np.nan
 
-        self.benchmark_medians = self.df_assessment.beta_median
-        self.benchmark_stdevs = self.df_assessment.beta_standard_deviation
-        self.site_coeffs = [self.base, self.cdd, self.betc, self.hdd, self.beth]
+        self.base = self.benchmark_stats['beta_base']['site_coefficient']
+        self.cdd = self.benchmark_stats['beta_cdd']['site_coefficient']
+        self.betc = self.benchmark_stats['beta_betc']['site_coefficient']
+        self.hdd = self.benchmark_stats['beta_hdd']['site_coefficient']
+        self.beth = self.benchmark_stats['beta_beth']['site_coefficient']
 
-    # self.utility_type: electricity = 1, fossil fuel = 2
-    # target_level: conservative = 1, nominal = 2, aggressive = 3
-    def set_targets(self, target_level):
+    def set_targets(self, target_level: Literal['conservative', 'nominal', 'aggressive']):
+        """Set Targets for Opportunity Engine"""
 
-        self.n = len(self.site_coeffs)
-        self.targets = np.zeros(self.n)
-
-        # print(self.n)
         print('---------------------------------------------------------------')
-        print(self.utility_type_str)
+        print(self.utility_type)
         print('Site Coefficients:')
-        print(self.site_coeffs)
+        [print(k, v['site_coefficient'])
+         for k, v in self.benchmark_stats.items()]
 
-        if target_level == 1:
-            for i in range(0, self.n):
-                beta_name = self.df_assessment.index[i]
-                if np.isnan(self.site_coeffs[i]):
-                    self.targets[i] = np.nan
-                elif beta_name == 'beta_betc':
-                    self.targets[i] = max(self.benchmark_medians[i] - self.benchmark_stdevs[i], self.site_coeffs[i])
+        if target_level == 'conservative':
+            # Target is 1 standard deviation above the median for each coefficient
+            for coefficient_name, coefficient_values in self.benchmark_stats.items():
+                if np.isnan(coefficient_values['site_coefficient']):
+                    self.benchmark_stats[coefficient_name]['target'] = np.nan
+                elif coefficient_name == 'beta_betc':
+                    self.benchmark_stats[coefficient_name]['target'] = max(coefficient_values['beta_median'] - coefficient_values['beta_standard_deviation'],
+                                                                           coefficient_values['site_coefficient'])
                 else:
-                    self.targets[i] = min(self.benchmark_medians[i] + self.benchmark_stdevs[i], self.site_coeffs[i])
+                    self.benchmark_stats[coefficient_name]['target'] = min(coefficient_values['beta_median'] + coefficient_values['beta_standard_deviation'],
+                                                                           coefficient_values['site_coefficient'])
 
-        elif target_level == 2:
-            for i in range(0, self.n):
-                beta_name = self.df_assessment.index[i]
-                if np.isnan(self.site_coeffs[i]):
-                    self.targets[i] = np.nan
+        elif target_level == 'nominal':
+            # Target is the median for each coefficient
+            for coefficient_name, coefficient_values in self.benchmark_stats.items():
+                if np.isnan(coefficient_values['site_coefficient']):
+                    self.benchmark_stats[coefficient_name]['target'] = np.nan
+                elif coefficient_name == 'beta_betc':
+                    self.benchmark_stats[coefficient_name]['target'] = max(coefficient_values['beta_median'],
+                                                                           coefficient_values['site_coefficient'])
                 else:
-                    if beta_name == 'beta_betc':
-                        self.targets[i] = max(self.benchmark_medians[i], self.site_coeffs[i])
-                    else:
-                        self.targets[i] = min(self.benchmark_medians[i], self.site_coeffs[i])
+                    self.benchmark_stats[coefficient_name]['target'] = min(coefficient_values['beta_median'],
+                                                                           coefficient_values['site_coefficient'])
 
-        elif target_level == 3:
-            for i in range(0, self.n):
-                beta_name = self.df_assessment.index[i]
-                if np.isnan(self.site_coeffs[i]):
-                    self.targets[i] = np.nan
+        elif target_level == 'aggressive':
+            # Target is half a standard deviation below the median for each coefficient
+            for coefficient_name, coefficient_values in self.benchmark_stats.items():
+                if np.isnan(coefficient_values['site_coefficient']):
+                    self.benchmark_stats[coefficient_name]['target'] = np.nan
+                elif coefficient_name == 'beta_betc':
+                    self.benchmark_stats[coefficient_name]['target'] = max(coefficient_values['beta_median'] + 0.5 * coefficient_values['beta_standard_deviation'],
+                                                                           coefficient_values['site_coefficient'])
                 else:
-                    if beta_name == 'beta_betc':
-                        self.targets[i] = max(self.benchmark_medians[i] + (0.5 * self.benchmark_stdevs[i]), self.site_coeffs[i])
-                    else:
-                        self.targets[i] = min(self.benchmark_medians[i] - (0.5 * self.benchmark_stdevs[i]), self.site_coeffs[i])
+                    self.benchmark_stats[coefficient_name]['target'] = min(coefficient_values['beta_median'] - 0.5 * coefficient_values['beta_standard_deviation'],
+                                                                           coefficient_values['site_coefficient'])
 
-        self.base_targ = self.targets[0]
-        self.cdd_targ = self.targets[1]
-        self.betc_targ = self.targets[2]
-        self.hdd_targ = self.targets[3]
-        self.beth_targ = self.targets[4]
+        self.base_targ = self.benchmark_stats['beta_base']['target']
+        self.cdd_targ = self.benchmark_stats['beta_cdd']['target']
+        self.betc_targ = self.benchmark_stats['beta_betc']['target']
+        self.hdd_targ = self.benchmark_stats['beta_hdd']['target']
+        self.beth_targ = self.benchmark_stats['beta_beth']['target']
 
         print('Target Coefficients:')
-        print(self.targets)
+        [print(k, v['target'])
+         for k, v in self.benchmark_stats.items()]
         print('---------------------------------------------------------------')
 
-    def FIM_recommendations(self, save_file=True):
-        column = ['FIM Recommendations']
-        rows = ['Increase Cooling Setpoints', 'Decrease Heating Setpoints',
-                'Reduce Equipment Schedules', 'Decrease Ventilation',
-                'Eliminate Electric Heating', 'Decrease Infiltration',
-                'Reduce Lighting Load', 'Reduce Plug Loads', 'Add/Fix Economizers',
-                'Increase Cooling System Efficiency',
-                'Increase Heating System Efficiency', 'Add Wall/Ceiling Insulation',
-                'Upgrade Windows', 'Check Fossil Baseload']
-        self.FIM_table = pd.DataFrame(index=rows, columns=column)
+    def calculate_recommendations(self) -> dict:
+        # recs = ['Increase Cooling Setpoints', 'Decrease Heating Setpoints',
+        #         'Reduce Equipment Schedules', 'Decrease Ventilation',
+        #         'Eliminate Electric Heating', 'Decrease Infiltration',
+        #         'Reduce Lighting Load', 'Reduce Plug Loads', 'Add/Fix Economizers',
+        #         'Increase Cooling System Efficiency',
+        #         'Increase Heating System Efficiency', 'Add Wall/Ceiling Insulation',
+        #         'Upgrade Windows', 'Check Fossil Baseload']
 
-        ovrd_thres = 1
-        ovrd_val = 0.001
+        self.recommendations = {}
 
-        # Increase Cooling Setpoint (indicated by low betc)
+        override_threshold = True
+        override_value = 0.001
+
         setpoint_recommendation = False  # used for scheduling measure
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.2
+
+        # region Increase Cooling Setpoint (indicated by low betc)
+        recommendation_name = 'Increase Cooling Setpoints'
+        threshold = override_value if override_threshold else 0.2
+
         if (self.betc_targ - self.betc) >= (threshold * self.betc_targ):
-            self.FIM_table.loc['Increase Cooling Setpoints'] = 'X'
+            # used for scheduling measure
+            self.recommendations[recommendation_name] = True
             setpoint_recommendation = True
-
-        # Decrease Heating Setpoint (indicated by high beth)
-        if ovrd_thres:
-            threshold = ovrd_val
         else:
-            threshold = 0.2
-        if (self.beth - self.beth_targ) >= (threshold * self.beth_targ):
-            self.FIM_table.loc['Decrease Heating Setpoints'] = 'X'
-            setpoint_recommendation = True
+            self.recommendations[recommendation_name] = False
 
-        # Tighten Schedules (indicated by high electric baseload)
+        # endregion
+
+        # region Decrease Heating Setpoint (indicated by high beth)
+        recommendation_name = 'Decrease Heating Setpoints'
+        threshold = override_value if override_threshold else 0.2
+
+        if (self.beth - self.beth_targ) >= (threshold * self.beth_targ):
+            self.recommendations[recommendation_name] = True
+            setpoint_recommendation = True
+        else:
+            self.recommendations[recommendation_name] = False
+        # endregion
+
+        # region Tighten Schedules (indicated by high electric baseload)
         """
         9/20/13 - Added logic to also recommend schedules if recommending
         increasing cooling setpoints or decreasing heating setpoints. A
@@ -135,36 +140,38 @@ class LEAN_FIMs:
         schedules for switching between an occupied and unoccupied setpoint
         will also change the average building temperatures.
         """
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.001
+        recommendation_name = 'Reduce Equipment Schedules'
+        threshold = override_value if override_threshold else 0.001
 
         if self.utility_type == 1 and self.base > 0 and (self.base - self.base_targ) >= (threshold * self.base_targ):
-            self.FIM_table.loc['Reduce Equipment Schedules'] = 'X'
+            self.recommendations[recommendation_name] = True
         elif setpoint_recommendation:
-            self.FIM_table.loc['Reduce Equipment Schedules'] = 'X'
+            self.recommendations[recommendation_name] = True
+        else:
+            self.recommendations[recommendation_name] = False
 
-        # Decrease Ventilation (indicated by two of the following three: high cdd, high hdd, high beth)
+        # endregion
+
+        # region Decrease Ventilation (indicated by two of the following three: high cdd, high hdd, high beth)
+        recommendation_name = 'Decrease Ventilation'
         count = 0
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.1
-        if self.cdd > 0 and (self.cdd - self.cdd_targ) >= (threshold * self.cdd_targ):
-            count = count + 1
-        if self.hdd > 0 and (self.hdd - self.hdd_targ) >= (threshold * self.hdd_targ):
-            count = count + 1
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.2
-        if (self.beth - self.beth_targ) >= (threshold * self.beth_targ):
-            count = count + 1
-        if count >= 2:
-            self.FIM_table.loc['Decrease Ventilation'] = 'X'
+        threshold = override_value if override_threshold else 0.1
 
-        # Eliminate Any Electric Heating
+        if self.cdd > 0 and (self.cdd - self.cdd_targ) >= (threshold * self.cdd_targ):
+            count += 1
+        if self.hdd > 0 and (self.hdd - self.hdd_targ) >= (threshold * self.hdd_targ):
+            count += 1
+
+        threshold = override_value if override_threshold else 0.2
+
+        if (self.beth - self.beth_targ) >= (threshold * self.beth_targ):
+            count += 1
+
+        self.recommendations[recommendation_name] = count >= 2
+
+        # endregion
+
+        # region Eliminate Any Electric Heating
         """
         Before 9/20/2013, electric heating indicated by electric fuel and HDD>0.
         Added threshold to improve diagnostic and reduce mis-diagnosis of electric
@@ -172,147 +179,156 @@ class LEAN_FIMs:
         around 0.04 kWh/m2 while electric beta_hdd's without electric heating
         are around 0.004 kWh/m2.
         """
+        recommendation_name = 'Eliminate Electric Heating'
         electric_htg_threshold = 0.01
-        if self.utility_type == 1 and self.hdd > electric_htg_threshold:
-            self.FIM_table.loc['Eliminate Electric Heating'] = 'X'
 
-        # Decrease Infiltration (indicated by two of the following three: high cdd, high hdd, high beth)
+        if self.utility_type == 'electric' and self.hdd > electric_htg_threshold:
+            self.recommendations[recommendation_name] = True
+        else:
+            self.recommendations[recommendation_name] = False
+
+        # endregion
+
+        # region Decrease Infiltration (indicated by two of the following three: high cdd, high hdd, high beth)
+        recommendation_name = 'Decrease Infiltration'
         count = 0
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.1
+        threshold = override_value if override_threshold else 0.1
+
         if self.cdd > 0 and (self.cdd - self.cdd_targ) >= (threshold * self.cdd_targ):
-            count = count + 1
+            count += 1
         if self.hdd > 0 and (self.hdd - self.hdd_targ) >= (threshold * self.hdd_targ):
-            count = count + 1
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.2
+            count += 1
+
+        threshold = override_value if override_threshold else 0.2
+
         if (self.beth - self.beth_targ) >= (threshold * self.beth_targ):
             count = count + 1
-        if count >= 2:
-            self.FIM_table.loc['Decrease Infiltration'] = 'X'
 
-        # Reduce Lighting Load (indicated by high baseload)
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.001
+        self.recommendations[recommendation_name] = count >= 2
+
+        # endregion
+
+        # region Reduce Lighting Load (indicated by high baseload)
+        recommendation_name = 'Reduce Lighting Load'
+        threshold = override_value if override_threshold else 0.001
+
         if self.utility_type == 1 and self.base > 0 and (self.base - self.base_targ) >= (threshold * self.base_targ):
-            self.FIM_table.loc['Reduce Lighting Load'] = 'X'
-
-        # Reduce Plug Load (indicated by high baseload)
-        if ovrd_thres:
-            threshold = ovrd_val
+            self.recommendations[recommendation_name] = True
         else:
-            threshold = 0.001
+            self.recommendations[recommendation_name] = False
+
+        # endregion
+
+        # region Reduce Plug Load (indicated by high baseload)
+        recommendation_name = 'Reduce Plug Loads'
+        threshold = override_value if override_threshold else 0.001
+
         if self.utility_type == 1 and self.base > 0 and (self.base - self.base_targ) >= (threshold * self.base_targ):
-            self.FIM_table.loc['Reduce Plug Loads'] = 'X'
-
-        # Add/Fix Economizers (indicated by low betc)
-        if ovrd_thres:
-            threshold = ovrd_val
+            self.recommendations[recommendation_name] = True
         else:
-            threshold = 0.2
+            self.recommendations[recommendation_name] = False
+
+        # endregion
+
+        # region Add/Fix Economizers (indicated by low betc)
+        recommendation_name = 'Add/Fix Economizers'
+        threshold = override_value if override_threshold else 0.2
+
         if (self.betc_targ - self.betc) >= (threshold * self.betc_targ):
-            self.FIM_table.loc['Add/Fix Economizers'] = 'X'
-
-        # Increase Cooling Efficiency (indicated by high cdd)
-        if ovrd_thres:
-            threshold = ovrd_val
+            self.recommendations[recommendation_name] = True
         else:
-            threshold = 0.1
+            self.recommendations[recommendation_name] = False
+
+        # endregion
+
+        # region Increase Cooling Efficiency (indicated by high cdd)
+        recommendation_name = 'Increase Cooling System Efficiency'
+        threshold = override_value if override_threshold else 0.1
+
         if self.cdd > 0 and (self.cdd - self.cdd_targ) >= (threshold * self.cdd_targ):
-            self.FIM_table.loc['Increase Cooling System Efficiency'] = 'X'
-
-        # Increase Heating Efficiency (indicated by high hdd)
-        if ovrd_thres:
-            threshold = ovrd_val
+            self.recommendations[recommendation_name] = True
         else:
-            threshold = 0.1
-        if self.hdd > 0 and (self.hdd - self.hdd_targ) >= (threshold * self.hdd_targ):
-            self.FIM_table.loc['Increase Heating System Efficiency'] = 'X'
+            self.recommendations[recommendation_name] = False
 
-        # Add Wall/Ceiling Insulation (indicated by two of the following three: high cdd, high hdd, high beth)
+        # endregion
+
+        # region Increase Heating Efficiency (indicated by high hdd)
+        recommendation_name = 'Increase Heating System Efficiency'
+        threshold = override_value if override_threshold else 0.1
+
+        if self.hdd > 0 and (self.hdd - self.hdd_targ) >= (threshold * self.hdd_targ):
+            self.recommendations[recommendation_name] = True
+        else:
+            self.recommendations[recommendation_name] = False
+
+        # endregion
+
+        # region Add Wall/Ceiling Insulation (indicated by two of the following three: high cdd, high hdd, high beth)
+        recommendation_name = 'Add Wall/Ceiling Insulation'
         count = 0
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.1
+        threshold = override_value if override_threshold else 0.1
+
         if self.cdd > 0 and (self.cdd - self.cdd_targ) >= (threshold * self.cdd_targ):
-            count = count + 1
+            count += 1
         if self.hdd > 0 and (self.hdd - self.hdd_targ) >= (threshold * self.hdd_targ):
-            count = count + 1
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.2
+            count += 1
+
+        threshold = override_value if override_threshold else 0.2
+
         if (self.beth - self.beth_targ) >= (threshold * self.beth_targ):
             count = count + 1
-        if count >= 2:
-            self.FIM_table.loc['Add Wall/Ceiling Insulation'] = 'X'
 
-        # Upgrade Windows (indicated by all of the following: high cdd, low betc, high hdd)
+        self.recommendations[recommendation_name] = count >= 2
+
+        # endregion
+
+        # region Upgrade Windows (indicated by all of the following: high cdd, low betc, high hdd)
+        recommendation_name = 'Upgrade Windows'
         count = 0
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.1
-        if self.cdd > 0 and (self.cdd - self.cdd_targ) >= (threshold * self.cdd_targ):
-            count = count + 1
-        if self.hdd > 0 and (self.hdd - self.hdd_targ) >= (threshold * self.hdd_targ):
-            count = count + 1
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.2
-        if (self.betc_targ - self.betc) >= (threshold * self.betc_targ):
-            count = count + 1
-        if count == 3:
-            self.FIM_table.loc['Upgrade Windows'] = 'X'
+        threshold = override_value if override_threshold else 0.1
 
-        # Check Excessive Fossil Fuel Baseload
-        if ovrd_thres:
-            threshold = ovrd_val
-        else:
-            threshold = 0.001
+        if self.cdd > 0 and (self.cdd - self.cdd_targ) >= (threshold * self.cdd_targ):
+            count += 1
+        if self.hdd > 0 and (self.hdd - self.hdd_targ) >= (threshold * self.hdd_targ):
+            count += 1
+
+        threshold = override_value if override_threshold else 0.2
+
+        if (self.betc_targ - self.betc) >= (threshold * self.betc_targ):
+            count += 1
+
+        self.recommendations[recommendation_name] = (count == 3)
+
+        # endregion
+
+        # region Check Excessive Fossil Fuel Baseload
+        recommendation_name = 'Check Fossil Baseload'
+        threshold = override_value if override_threshold else 0.001
+
         if self.utility_type == 2 and self.base > 0 and (self.base - self.base_targ) >= (threshold * self.base_targ):
-            self.FIM_table.loc['Check Fossil Baseload'] = 'X'
-        # if(save_file): self.FIM_table.to_csv(self.utility_type_str + " FIM_recommendations.csv")
-        return self.FIM_table
+            self.recommendations[recommendation_name] = True
+        else:
+            self.recommendations[recommendation_name] = False
 
-    def savings_coefficients(self, save_file=True):
-        columns = ['coefficients', 'original_coefficients', 'savings_coefficients']
-        rows = ['beta_base', 'beta_cdd', 'beta_betc', 'beta_hdd', 'beta_beth']
-        self.coeff_out = pd.DataFrame(columns=columns)
-        for i in range(0, len(rows)):
-            self.coeff_out.loc[i, columns[0]] = rows[i]
-            self.coeff_out.loc[i, columns[1]] = self.site_coeffs[i]
-            if(self.site_coeffs[i] > self.targets[i]):
-                if(i==2):
-                    self.coeff_out.loc[i, columns[2]] = self.site_coeffs[i]
+        # endregion
+
+        return self.recommendations
+
+    def savings_coefficients(self) -> dict:
+
+        for coefficient_name, coefficient_values in self.benchmark_stats.items():
+            site_coefficient = coefficient_values['site_coefficient']
+            target = coefficient_values['target']
+
+            if (site_coefficient > target):
+                if (coefficient_name == 'beta_betc'):
+                    coefficient_values['savings_coefficient'] = site_coefficient
                 else:
-                    self.coeff_out.loc[i, columns[2]] = self.targets[i]
+                    coefficient_values['savings_coefficient'] = target
             else:
-                if(i==2):
-                    self.coeff_out.loc[i, columns[2]] = self.targets[i]
+                if (coefficient_name == 'beta_betc'):
+                    coefficient_values['savings_coefficient'] = target
                 else:
-                    self.coeff_out.loc[i, columns[2]] = self.site_coeffs[i]
-        self.coeff_out = self.coeff_out.set_index(columns[0])
-        # if(save_file): self.coeff_out.to_csv(self.utility_type_str + " Coeffs_out.csv")
-        return self.coeff_out
+                    coefficient_values['savings_coefficient'] = site_coefficient
 
-
-if __name__ == "__main__":
-    test_site_coeffs = [0, 2, 3, 0, 0]
-    df_assessment = constants.Constants.df_sample_benchmark_stats
-    df_assessment["site_coefficients"] = test_site_coeffs
-
-    # print(df_assessment)
-
-    example_FIM_analysis = LEAN_FIMs(df_assessment, 1)  # (electricity = 1, fossil fuel = 2)
-    example_FIM_analysis.set_targets(1)  # conservative = 1, nominal = 2, aggressive = 3
-    example_FIM_analysis.FIM_recommendations()
-    example_FIM_analysis.savings_coefficients()
+        return self.benchmark_stats
